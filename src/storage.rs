@@ -5,9 +5,9 @@ use diesel::sql_types::{Bool, Integer, Interval};
 use diesel::{delete, insert_into, update};
 use serde_json;
 
-use crate::Job;
-use crate::schema::background_jobs;
 use crate::errors::EnqueueError;
+use crate::schema::background_jobs;
+use crate::Job;
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
 pub struct BackgroundJob {

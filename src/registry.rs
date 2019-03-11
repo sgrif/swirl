@@ -4,8 +4,8 @@ use serde_json;
 use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
 
-use crate::Job;
 use crate::errors::PerformError;
+use crate::Job;
 
 #[doc(hidden)]
 pub type PerformFn<Env> =

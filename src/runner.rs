@@ -6,9 +6,9 @@ use std::panic::{catch_unwind, PanicInfo, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 
-use crate::{storage, Job, Registry};
-use crate::errors::*;
 use crate::db::DieselPool;
+use crate::errors::*;
+use crate::{storage, Job, Registry};
 
 #[allow(missing_debug_implementations)]
 pub struct Builder<Env, ConnectionPool> {
@@ -63,7 +63,10 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
     /// connection pool, and the environment to pass to your jobs. If your
     /// environment contains a connection pool, it should be the same pool given
     /// here.
-    pub fn builder(connection_pool: ConnectionPool, environment: Env) -> Builder<Env, ConnectionPool> {
+    pub fn builder(
+        connection_pool: ConnectionPool,
+        environment: Env,
+    ) -> Builder<Env, ConnectionPool> {
         Builder {
             connection_pool,
             environment,
@@ -325,9 +328,7 @@ mod tests {
             .min_idle(Some(0))
             .build_unchecked(manager);
 
-        Runner::builder(pool, ())
-            .thread_count(2)
-            .build()
+        Runner::builder(pool, ()).thread_count(2).build()
     }
 
     fn create_dummy_job(runner: &Runner<()>) -> storage::BackgroundJob {
