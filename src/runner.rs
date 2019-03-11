@@ -6,29 +6,35 @@ use std::sync::Arc;
 use threadpool::ThreadPool;
 
 use super::{storage, Job, Registry};
-use crate::db::{DieselPool, DieselPooledConn};
+use crate::db::DieselPool;
 use crate::util::errors::*;
 
 #[allow(missing_debug_implementations)]
-pub struct Builder<Env> {
-    connection_pool: DieselPool,
+pub struct Builder<Env, ConnectionPool> {
+    connection_pool: ConnectionPool,
     environment: Env,
     registry: Registry<Env>,
     thread_count: Option<usize>,
 }
 
-impl<Env> Builder<Env> {
+impl<Env, ConnectionPool: DieselPool> Builder<Env, ConnectionPool> {
+    /// Register a job type to be run
+    ///
+    /// This function must be called for every job you intend to enqueue
     pub fn register<T: Job<Environment = Env>>(mut self) -> Self {
         self.registry.register::<T>();
         self
     }
 
+    /// Set the number of threads to be used to run jobs concurrently.
+    /// Defaults to 5
     pub fn thread_count(mut self, thread_count: usize) -> Self {
         self.thread_count = Some(thread_count);
         self
     }
 
-    pub fn build(self) -> Runner<Env> {
+    /// Build the runner
+    pub fn build(self) -> Runner<Env, ConnectionPool> {
         Runner {
             connection_pool: self.connection_pool,
             thread_pool: ThreadPool::new(self.thread_count.unwrap_or(5)),
@@ -39,14 +45,21 @@ impl<Env> Builder<Env> {
 }
 
 #[allow(missing_debug_implementations)]
-pub struct Runner<Env> {
-    connection_pool: DieselPool,
+/// The core runner responsible for locking and running jobs
+pub struct Runner<Env, ConnectionPool> {
+    connection_pool: ConnectionPool,
     thread_pool: ThreadPool,
     environment: Arc<Env>,
     registry: Arc<Registry<Env>>,
 }
 
-impl<Env: RefUnwindSafe + Send + Sync + 'static> Runner<Env> {
+impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
+    /// Create a builder for a job runner
+    ///
+    /// This method takes the two required configurations, the database
+    /// connection pool, and the environment to pass to your jobs. If your
+    /// environment contains a connection pool, it should be the same pool given
+    /// here.
     pub fn builder(connection_pool: DieselPool, environment: Env) -> Builder<Env> {
         Builder {
             connection_pool,
@@ -55,7 +68,13 @@ impl<Env: RefUnwindSafe + Send + Sync + 'static> Runner<Env> {
             thread_count: None,
         }
     }
+}
 
+impl<Env, ConnectionPool> Runner<Env>
+where
+    Env: RefUnwindSafe + Send + Sync + 'static,
+    ConnectionPool: DieselPool + 'static,
+{
     pub fn run_all_pending_jobs(&self) -> CargoResult<()> {
         if let Some(conn) = self.try_connection() {
             let available_job_count = storage::available_job_count(&conn)?;
@@ -115,7 +134,7 @@ impl<Env: RefUnwindSafe + Send + Sync + 'static> Runner<Env> {
     }
 
     fn try_connection(&self) -> Option<DieselPooledConn> {
-        self.connection_pool.try_get()
+        self.connection_pool.get().ok()
     }
 
     pub fn assert_no_failed_jobs(&self) -> CargoResult<()> {
@@ -296,9 +315,8 @@ mod tests {
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
         let manager = r2d2::ConnectionManager::new(database_url);
-        let pool = r2d2::Pool::builder().max_size(2).build(manager).unwrap();
 
-        Runner::builder(DieselPool::Pool(pool), ())
+        Runner::builder(manager, ())
             .thread_count(2)
             .build()
     }

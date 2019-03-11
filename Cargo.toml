@@ -9,6 +9,11 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 diesel = { version = "1.0.0", default-features = false, features = ["postgres"] }
 threadpool = "1.7"
+serde_json = "1.0.0"
+serde = "1.0.0"
 
 [dev-dependencies]
 lazy_static = "1.0"
+
+[features]
+r2d2 = ["diesel/r2d2"]
