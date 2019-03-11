@@ -264,7 +264,7 @@ mod tests {
         assert_eq!(1, tries);
     }
 
-    lazy_static! {
+    lazy_static::lazy_static! {
         // Since these tests deal with behavior concerning multiple connections
         // running concurrently, they have to run outside of a transaction.
         // Therefore we can't run more than one at a time.

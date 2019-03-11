@@ -31,7 +31,7 @@ fn retriable() -> Box<dyn BoxableExpression<background_jobs::table, Pg, SqlType 
     use crate::schema::background_jobs::dsl::*;
     use diesel::dsl::*;
 
-    sql_function!(power, power_t, (x: Integer, y: Integer) -> Integer);
+    sql_function!(fn power(x: Integer, y: Integer) -> Integer);
 
     Box::new(last_retry.lt(now - 1.minute().into_sql::<Interval>() * power(2, retries)))
 }
