@@ -4,12 +4,12 @@ use serde_json;
 use std::collections::HashMap;
 use std::panic::RefUnwindSafe;
 
-use super::Job;
-use crate::util::CargoResult;
+use crate::Job;
+use crate::errors::PerformError;
 
 #[doc(hidden)]
 pub type PerformFn<Env> =
-    Box<dyn Fn(serde_json::Value, &Env) -> CargoResult<()> + RefUnwindSafe + Send + Sync>;
+    Box<dyn Fn(serde_json::Value, &Env) -> Result<(), PerformError> + RefUnwindSafe + Send + Sync>;
 
 #[derive(Default)]
 #[allow(missing_debug_implementations)] // Can't derive debug

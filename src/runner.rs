@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 use diesel::prelude::*;
 use std::any::Any;
+use std::error::Error;
 use std::panic::{catch_unwind, PanicInfo, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 
-use super::{storage, Job, Registry};
+use crate::{storage, Job, Registry};
+use crate::errors::*;
 use crate::db::DieselPool;
-use crate::util::errors::*;
 
 #[allow(missing_debug_implementations)]
 pub struct Builder<Env, ConnectionPool> {
@@ -16,6 +17,8 @@ pub struct Builder<Env, ConnectionPool> {
     registry: Registry<Env>,
     thread_count: Option<usize>,
 }
+
+type DieselPooledConn<Pool> = <Pool as DieselPool>::Connection;
 
 impl<Env, ConnectionPool: DieselPool> Builder<Env, ConnectionPool> {
     /// Register a job type to be run
@@ -60,7 +63,7 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
     /// connection pool, and the environment to pass to your jobs. If your
     /// environment contains a connection pool, it should be the same pool given
     /// here.
-    pub fn builder(connection_pool: DieselPool, environment: Env) -> Builder<Env> {
+    pub fn builder(connection_pool: ConnectionPool, environment: Env) -> Builder<Env, ConnectionPool> {
         Builder {
             connection_pool,
             environment,
@@ -70,12 +73,12 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
     }
 }
 
-impl<Env, ConnectionPool> Runner<Env>
+impl<Env, ConnectionPool> Runner<Env, ConnectionPool>
 where
     Env: RefUnwindSafe + Send + Sync + 'static,
     ConnectionPool: DieselPool + 'static,
 {
-    pub fn run_all_pending_jobs(&self) -> CargoResult<()> {
+    pub fn run_all_pending_jobs(&self) -> Result<(), PerformError> {
         if let Some(conn) = self.try_connection() {
             let available_job_count = storage::available_job_count(&conn)?;
             for _ in 0..available_job_count {
@@ -91,20 +94,20 @@ where
         self.get_single_job(move |job| {
             let perform_fn = registry
                 .get(&job.job_type)
-                .ok_or_else(|| internal(&format_args!("Unknown job type {}", job.job_type)))?;
+                .ok_or_else(|| PerformError::from(format!("Unknown job type {}", job.job_type)))?;
             perform_fn(job.data, &environment)
         })
     }
 
     fn get_single_job<F>(&self, f: F)
     where
-        F: FnOnce(storage::BackgroundJob) -> CargoResult<()> + Send + UnwindSafe + 'static,
+        F: FnOnce(storage::BackgroundJob) -> Result<(), PerformError> + Send + UnwindSafe + 'static,
     {
         // The connection may not be `Send` so we need to clone the pool instead
         let pool = self.connection_pool.clone();
         self.thread_pool.execute(move || {
             let conn = pool.get().expect("Could not acquire connection");
-            conn.transaction::<_, Box<dyn CargoError>, _>(|| {
+            conn.transaction::<_, PerformError, _>(|| {
                 let job = storage::find_next_unlocked_job(&conn).optional()?;
                 let job = match job {
                     Some(j) => j,
@@ -129,15 +132,15 @@ where
         })
     }
 
-    fn connection(&self) -> CargoResult<DieselPooledConn> {
+    fn connection(&self) -> Result<DieselPooledConn<ConnectionPool>, Box<dyn Error>> {
         self.connection_pool.get().map_err(Into::into)
     }
 
-    fn try_connection(&self) -> Option<DieselPooledConn> {
+    fn try_connection(&self) -> Option<DieselPooledConn<ConnectionPool>> {
         self.connection_pool.get().ok()
     }
 
-    pub fn assert_no_failed_jobs(&self) -> CargoResult<()> {
+    pub fn assert_no_failed_jobs(&self) -> Result<(), Box<dyn Error>> {
         self.wait_for_jobs();
         let failed_jobs = storage::failed_job_count(&*self.connection()?)?;
         assert_eq!(0, failed_jobs);
@@ -156,15 +159,15 @@ where
 /// However, the `panic::set_hook` functions deal with a `PanicInfo` type, and its payload is
 /// documented as "commonly but not always `&'static str` or `String`". So we can try all of those,
 /// and give up if we didn't get one of those three types.
-fn try_to_extract_panic_info(info: &(dyn Any + Send + 'static)) -> Box<dyn CargoError> {
+fn try_to_extract_panic_info(info: &(dyn Any + Send + 'static)) -> Box<dyn Error> {
     if let Some(x) = info.downcast_ref::<PanicInfo>() {
-        internal(&format_args!("job panicked: {}", x))
+        format!("job panicked: {}", x).into()
     } else if let Some(x) = info.downcast_ref::<&'static str>() {
-        internal(&format_args!("job panicked: {}", x))
+        format!("job panicked: {}", x).into()
     } else if let Some(x) = info.downcast_ref::<String>() {
-        internal(&format_args!("job panicked: {}", x))
+        format!("job panicked: {}", x).into()
     } else {
-        internal("job panicked")
+        "job panicked".into()
     }
 }
 

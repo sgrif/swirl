@@ -5,9 +5,9 @@ use diesel::sql_types::{Bool, Integer, Interval};
 use diesel::{delete, insert_into, update};
 use serde_json;
 
-use super::Job;
+use crate::Job;
 use crate::schema::background_jobs;
-use crate::util::CargoResult;
+use crate::errors::EnqueueError;
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
 pub struct BackgroundJob {
@@ -17,7 +17,7 @@ pub struct BackgroundJob {
 }
 
 /// Enqueues a job to be run as soon as possible.
-pub fn enqueue_job<T: Job>(conn: &PgConnection, job: T) -> CargoResult<()> {
+pub fn enqueue_job<T: Job>(conn: &PgConnection, job: T) -> Result<(), EnqueueError> {
     use crate::schema::background_jobs::dsl::*;
 
     let job_data = serde_json::to_value(job)?;

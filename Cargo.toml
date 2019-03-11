@@ -7,7 +7,7 @@ description = "A simple background processing framework for Diesel and PostgreSQ
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-diesel = { version = "1.0.0", default-features = false, features = ["postgres"] }
+diesel = { version = "1.0.0", default-features = false, features = ["postgres", "serde_json"] }
 threadpool = "1.7"
 serde_json = "1.0.0"
 serde = "1.0.0"

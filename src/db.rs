@@ -1,4 +1,6 @@
 use diesel::PgConnection;
+use std::error::Error;
+use std::ops::Deref;
 
 /// A connection pool for Diesel database connections
 ///
@@ -8,11 +10,11 @@ use diesel::PgConnection;
 /// you can implement this trait manually.
 pub trait DieselPool: Clone + Send {
     /// The smart pointer returned by this connection pool.
-    type Connection: Deref<PgConnection>;
+    type Connection: Deref<Target = PgConnection>;
 
     /// The error type returned when a connection could not be retreived from
     /// the pool.
-    type Error;
+    type Error: Error;
 
     /// Attempt to get a database connection from the pool. Errors if a
     /// connection could not be retrieved from the pool.
@@ -32,7 +34,7 @@ mod r2d2_impl {
 
     type ConnectionManager = r2d2::ConnectionManager<PgConnection>;
 
-    impl DieselPool for r2d2::Pool<ConnectionManager>; {
+    impl DieselPool for r2d2::Pool<ConnectionManager> {
         type Connection = r2d2::PooledConnection<ConnectionManager>;
         type Error = r2d2::Error;
 

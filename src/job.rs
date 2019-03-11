@@ -1,8 +1,8 @@
 use diesel::PgConnection;
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::storage;
-use crate::util::CargoResult;
+use crate::errors::{EnqueueError, PerformError};
+use crate::storage;
 
 /// A background job, meant to be run asynchronously.
 pub trait Job: Serialize + DeserializeOwned {
@@ -17,10 +17,10 @@ pub trait Job: Serialize + DeserializeOwned {
     const JOB_TYPE: &'static str;
 
     /// Enqueue this job to be run at some point in the future.
-    fn enqueue(self, conn: &PgConnection) -> CargoResult<()> {
+    fn enqueue(self, conn: &PgConnection) -> Result<(), EnqueueError> {
         storage::enqueue_job(conn, self)
     }
 
     /// The logic involved in actually performing this job.
-    fn perform(self, env: &Self::Environment) -> CargoResult<()>;
+    fn perform(self, env: &Self::Environment) -> Result<(), PerformError>;
 }

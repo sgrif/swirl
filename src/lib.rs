@@ -10,6 +10,8 @@ mod runner;
 mod schema;
 mod storage;
 
+pub mod errors;
+
 pub use self::db::DieselPool;
 pub use self::job::*;
 pub use self::registry::Registry;
