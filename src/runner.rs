@@ -162,7 +162,7 @@ where
 /// However, the `panic::set_hook` functions deal with a `PanicInfo` type, and its payload is
 /// documented as "commonly but not always `&'static str` or `String`". So we can try all of those,
 /// and give up if we didn't get one of those three types.
-fn try_to_extract_panic_info(info: &(dyn Any + Send + 'static)) -> Box<dyn Error> {
+fn try_to_extract_panic_info(info: &(dyn Any + Send + 'static)) -> PerformError {
     if let Some(x) = info.downcast_ref::<PanicInfo>() {
         format!("job panicked: {}", x).into()
     } else if let Some(x) = info.downcast_ref::<&'static str>() {
