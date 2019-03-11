@@ -6,7 +6,7 @@ use std::panic::{catch_unwind, PanicInfo, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 
-use crate::db::DieselPool;
+use crate::db::*;
 use crate::errors::*;
 use crate::{storage, Job, Registry};
 
@@ -18,9 +18,9 @@ pub struct Builder<Env, ConnectionPool> {
     thread_count: Option<usize>,
 }
 
-type DieselPooledConn<Pool> = <Pool as DieselPool>::Connection;
+type DieselPooledConn<'a, Pool> = <Pool as DieselPool<'a>>::Connection;
 
-impl<Env, ConnectionPool: DieselPool> Builder<Env, ConnectionPool> {
+impl<Env, ConnectionPool: DieselPoolOwned> Builder<Env, ConnectionPool> {
     /// Register a job type to be run
     ///
     /// This function must be called for every job you intend to enqueue
@@ -79,7 +79,7 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
 impl<Env, ConnectionPool> Runner<Env, ConnectionPool>
 where
     Env: RefUnwindSafe + Send + Sync + 'static,
-    ConnectionPool: DieselPool + 'static,
+    ConnectionPool: DieselPoolOwned + 'static,
 {
     pub fn run_all_pending_jobs(&self) -> Result<(), PerformError> {
         if let Some(conn) = self.try_connection() {
