@@ -36,7 +36,7 @@ mod r2d2_impl {
 
     impl DieselPool for r2d2::Pool<ConnectionManager> {
         type Connection = r2d2::PooledConnection<ConnectionManager>;
-        type Error = r2d2::Error;
+        type Error = r2d2::PoolError;
 
         fn get(&self) -> Result<Self::Connection, Self::Error> {
             self.get()

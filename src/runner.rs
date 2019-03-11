@@ -238,7 +238,7 @@ mod tests {
         runner.get_single_job(move |_| {
             barrier.0.wait();
             // error so the job goes back into the queue
-            Err(human("nope"))
+            Err("nope".into())
         });
 
         let conn = runner.connection().unwrap();
@@ -312,21 +312,27 @@ mod tests {
         }
     }
 
+    type Runner<Env> = crate::Runner<Env, r2d2::Pool<r2d2::ConnectionManager<PgConnection>>>;
+
     fn runner() -> Runner<()> {
         use dotenv;
 
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
         let manager = r2d2::ConnectionManager::new(database_url);
+        let pool = r2d2::Pool::builder()
+            .max_size(4)
+            .min_idle(Some(0))
+            .build_unchecked(manager);
 
-        Runner::builder(manager, ())
+        Runner::builder(pool, ())
             .thread_count(2)
             .build()
     }
 
     fn create_dummy_job(runner: &Runner<()>) -> storage::BackgroundJob {
         ::diesel::insert_into(background_jobs)
-            .values((job_type.eq("Foo"), data.eq(json!(null))))
+            .values((job_type.eq("Foo"), data.eq(serde_json::json!(null))))
             .returning((id, job_type, data))
             .get_result(&*runner.connection().unwrap())
             .unwrap()
