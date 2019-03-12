@@ -33,7 +33,7 @@ impl<'a, Env> TestGuard<'a, Env> {
         let manager = r2d2::ConnectionManager::new(database_url);
         let pool = pool_builder().build_unchecked(manager);
 
-        let builder = Runner::builder(pool, env).thread_count(2);
+        let builder = Runner::builder(pool, env);
 
         GuardBuilder { builder }
     }

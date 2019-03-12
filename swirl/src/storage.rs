@@ -60,13 +60,6 @@ pub fn failed_job_count(conn: &PgConnection) -> QueryResult<i64> {
         .get_result(conn)
 }
 
-/// The number of jobs available to be run
-pub fn available_job_count(conn: &PgConnection) -> QueryResult<i64> {
-    use crate::schema::background_jobs::dsl::*;
-
-    background_jobs.count().filter(retriable()).get_result(conn)
-}
-
 /// Deletes a job that has successfully completed running
 pub fn delete_successful_job(conn: &PgConnection, job_id: i64) -> QueryResult<()> {
     use crate::schema::background_jobs::dsl::*;

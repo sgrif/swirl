@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use diesel::prelude::*;
 use std::any::Any;
 use std::error::Error;
@@ -9,6 +8,10 @@ use threadpool::ThreadPool;
 use crate::db::*;
 use crate::errors::*;
 use crate::{storage, Job, Registry};
+use event::*;
+
+mod channel;
+mod event;
 
 #[allow(missing_debug_implementations)]
 pub struct Builder<Env, ConnectionPool> {
@@ -18,9 +21,7 @@ pub struct Builder<Env, ConnectionPool> {
     thread_count: Option<usize>,
 }
 
-type DieselPooledConn<'a, Pool> = <Pool as DieselPool<'a>>::Connection;
-
-impl<Env, ConnectionPool: DieselPoolOwned> Builder<Env, ConnectionPool> {
+impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
     /// Register a job type to be run
     ///
     /// This function must be called for every job you intend to enqueue
@@ -85,22 +86,53 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
 impl<Env, ConnectionPool> Runner<Env, ConnectionPool>
 where
     Env: RefUnwindSafe + Send + Sync + 'static,
-    ConnectionPool: DieselPoolOwned + 'static,
+    ConnectionPool: DieselPool + 'static,
 {
-    pub fn run_all_pending_jobs(&self) -> Result<(), PerformError> {
-        if let Some(conn) = self.try_connection() {
-            let available_job_count = storage::available_job_count(&conn)?;
-            for _ in 0..available_job_count {
-                self.run_single_job()
+    /// Runs all pending jobs in the queue
+    ///
+    /// This function will return once all jobs in the queue have begun running,
+    /// but does not wait for them to complete. When this function returns, at
+    /// least one thread will have tried to acquire a new job, and found there
+    /// were none in the queue.
+    pub fn run_all_pending_jobs(&self) -> Result<(), FetchError<ConnectionPool>> {
+        use std::cmp::max;
+
+        let max_threads = self.thread_pool.max_count();
+        let (sender, receiver) = channel::new(max_threads);
+        let mut pending_messages = 0;
+        loop {
+            let available_threads = max_threads - self.thread_pool.active_count();
+
+            let jobs_to_queue = if pending_messages == 0 {
+                // If we have no queued jobs talking to us, and there are no
+                // available threads, we still need to queue at least one job
+                // or we'll never receive a message
+                max(available_threads, 1)
+            } else {
+                available_threads
+            };
+
+            for _ in 0..jobs_to_queue {
+                self.run_single_job(sender.clone());
+            }
+
+            pending_messages += 1;
+            match receiver.recv() {
+                Ok(Event::Working) => pending_messages -= 1,
+                Ok(Event::NoJobAvailable) => return Ok(()),
+                Ok(Event::ErrorLoadingJob(e)) => return Err(FetchError::FailedLoadingJob(e)),
+                Ok(Event::FailedToAcquireConnection(e)) => {
+                    return Err(FetchError::NoDatabaseConnection(e));
+                }
+                Err(_) => return Err(FetchError::NoMessageReceived),
             }
         }
-        Ok(())
     }
 
-    fn run_single_job(&self) {
+    fn run_single_job(&self, sender: EventSender<ConnectionPool>) {
         let environment = Arc::clone(&self.environment);
         let registry = Arc::clone(&self.registry);
-        self.get_single_job(move |job| {
+        self.get_single_job(sender, move |job| {
             let perform_fn = registry
                 .get(&job.job_type)
                 .ok_or_else(|| PerformError::from(format!("Unknown job type {}", job.job_type)))?;
@@ -108,19 +140,37 @@ where
         })
     }
 
-    fn get_single_job<F>(&self, f: F)
+    fn get_single_job<F>(&self, sender: EventSender<ConnectionPool>, f: F)
     where
         F: FnOnce(storage::BackgroundJob) -> Result<(), PerformError> + Send + UnwindSafe + 'static,
     {
+        use diesel::result::Error::RollbackTransaction;
+
         // The connection may not be `Send` so we need to clone the pool instead
         let pool = self.connection_pool.clone();
         self.thread_pool.execute(move || {
-            let conn = pool.get().expect("Could not acquire connection");
+            let conn = match pool.get() {
+                Ok(conn) => conn,
+                Err(e) => {
+                    sender.send(Event::FailedToAcquireConnection(e));
+                    return;
+                }
+            };
+
             conn.transaction::<_, PerformError, _>(|| {
-                let job = storage::find_next_unlocked_job(&conn).optional()?;
-                let job = match job {
-                    Some(j) => j,
-                    None => return Ok(()),
+                let job = match storage::find_next_unlocked_job(&conn).optional() {
+                    Ok(Some(j)) => {
+                        sender.send(Event::Working);
+                        j
+                    }
+                    Ok(None) => {
+                        sender.send(Event::NoJobAvailable);
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        sender.send(Event::ErrorLoadingJob(e));
+                        return Err(Box::new(RollbackTransaction));
+                    }
                 };
                 let job_id = job.id;
 
@@ -143,10 +193,6 @@ where
 
     fn connection(&self) -> Result<DieselPooledConn<ConnectionPool>, Box<dyn Error>> {
         self.connection_pool.get().map_err(Into::into)
-    }
-
-    fn try_connection(&self) -> Option<DieselPooledConn<ConnectionPool>> {
-        self.connection_pool.get().ok()
     }
 
     pub fn assert_no_failed_jobs(&self) -> Result<(), Box<dyn Error>> {
@@ -202,7 +248,7 @@ mod tests {
         let return_barrier = Arc::new(AssertUnwindSafe(Barrier::new(2)));
         let return_barrier2 = return_barrier.clone();
 
-        runner.get_single_job(move |job| {
+        runner.get_single_job(channel::dummy_sender(), move |job| {
             fetch_barrier.0.wait(); // Tell thread 2 it can lock its job
             assert_eq!(first_job_id, job.id);
             return_barrier.0.wait(); // Wait for thread 2 to lock its job
@@ -210,7 +256,7 @@ mod tests {
         });
 
         fetch_barrier2.0.wait(); // Wait until thread 1 locks its job
-        runner.get_single_job(move |job| {
+        runner.get_single_job(channel::dummy_sender(), move |job| {
             assert_eq!(second_job_id, job.id);
             return_barrier2.0.wait(); // Tell thread 1 it can unlock its job
             Ok(())
@@ -226,7 +272,7 @@ mod tests {
         let runner = runner();
         create_dummy_job(&runner);
 
-        runner.get_single_job(|_| Ok(()));
+        runner.get_single_job(channel::dummy_sender(), |_| Ok(()));
         runner.wait_for_jobs();
 
         let remaining_jobs = background_jobs
@@ -244,7 +290,7 @@ mod tests {
         let barrier = Arc::new(AssertUnwindSafe(Barrier::new(2)));
         let barrier2 = barrier.clone();
 
-        runner.get_single_job(move |_| {
+        runner.get_single_job(channel::dummy_sender(), move |_| {
             barrier.0.wait();
             // error so the job goes back into the queue
             Err("nope".into())
@@ -283,7 +329,7 @@ mod tests {
         let runner = runner();
         let job_id = create_dummy_job(&runner).id;
 
-        runner.get_single_job(|_| panic!());
+        runner.get_single_job(channel::dummy_sender(), |_| panic!());
         runner.wait_for_jobs();
 
         let tries = background_jobs
