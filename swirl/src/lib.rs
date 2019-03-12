@@ -13,6 +13,7 @@ pub mod errors;
 pub mod schema;
 
 pub use self::db::DieselPool;
+pub use self::errors::*;
 pub use self::job::*;
 pub use self::registry::Registry;
 pub use self::runner::*;
