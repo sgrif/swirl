@@ -74,6 +74,12 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
             thread_count: None,
         }
     }
+
+    #[doc(hidden)]
+    /// For use in integration tests
+    pub fn connection_pool(&self) -> &ConnectionPool {
+        &self.connection_pool
+    }
 }
 
 impl<Env, ConnectionPool> Runner<Env, ConnectionPool>

@@ -7,10 +7,10 @@ mod db;
 mod job;
 mod registry;
 mod runner;
-mod schema;
 mod storage;
 
 pub mod errors;
+pub mod schema;
 
 pub use self::db::DieselPool;
 pub use self::job::*;
