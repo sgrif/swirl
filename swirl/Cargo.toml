@@ -11,6 +11,7 @@ diesel = { version = "1.0.0", features = ["postgres", "serde_json"] }
 threadpool = "1.7"
 serde_json = "1.0.0"
 serde = "1.0.0"
+inventory = "0.1"
 
 [dev-dependencies]
 dotenv = "0.11"

@@ -17,6 +17,8 @@ impl Job for DummyJob {
     }
 }
 
+swirl::register_job!(DummyJob);
+
 fn main() -> Result<(), Box<dyn Error>> {
     let database_url = dotenv::var("DATABASE_URL")?;
     let num_cpus = num_cpus::get();
@@ -26,9 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build(connection_manager)?;
     println!("Enqueuing 100k jobs");
     enqueue_jobs(&*connection_pool.get()?).unwrap();
-    let runner = Runner::builder(connection_pool, ())
-        .register::<DummyJob>()
-        .build();
+    let runner = Runner::builder(connection_pool, ()).build();
     println!("Running jobs");
     let started = Instant::now();
 

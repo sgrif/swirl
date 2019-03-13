@@ -9,7 +9,7 @@ pub trait Job: Serialize + DeserializeOwned {
     /// The environment this job is run with. This is a struct you define,
     /// which should encapsulate things like database connection pools, any
     /// configuration, and any other static data or shared resources.
-    type Environment;
+    type Environment: 'static;
 
     /// The key to use for storing this job, and looking it up later.
     ///

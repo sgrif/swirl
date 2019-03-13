@@ -3,6 +3,9 @@
 #[macro_use]
 extern crate diesel;
 
+#[doc(hidden)]
+pub extern crate inventory;
+
 mod db;
 mod job;
 mod registry;
@@ -12,8 +15,11 @@ mod storage;
 pub mod errors;
 pub mod schema;
 
-pub use self::db::DieselPool;
-pub use self::errors::*;
-pub use self::job::*;
-pub use self::registry::Registry;
-pub use self::runner::*;
+pub use db::DieselPool;
+pub use errors::*;
+pub use job::*;
+pub use registry::Registry;
+pub use runner::*;
+
+#[doc(hidden)]
+pub use registry::JobVTable;
