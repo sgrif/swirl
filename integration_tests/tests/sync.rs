@@ -1,4 +1,4 @@
-use std::panic::{UnwindSafe, RefUnwindSafe};
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::sync::{Arc, Barrier as StdBarrier, BarrierWaitResult};
 
 #[derive(Clone)]

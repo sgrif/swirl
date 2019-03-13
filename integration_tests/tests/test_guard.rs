@@ -1,8 +1,8 @@
-use diesel::r2d2;
 use diesel::prelude::*;
-use swirl::{Runner, Builder};
-use std::sync::{Mutex, MutexGuard};
+use diesel::r2d2;
 use std::ops::{Deref, DerefMut};
+use std::sync::{Mutex, MutexGuard};
+use swirl::{Builder, Runner};
 
 use crate::db::*;
 use crate::dummy_jobs::*;
@@ -29,26 +29,19 @@ impl<'a, Env> TestGuard<'a, Env> {
         use dotenv;
 
         let database_url =
-            dotenv::var("TEST_DATABASE_URL")
-                .expect("TEST_DATABASE_URL must be set to run tests");
+            dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
         let manager = r2d2::ConnectionManager::new(database_url);
-        let pool = pool_builder()
-            .build_unchecked(manager);
+        let pool = pool_builder().build_unchecked(manager);
 
-        let builder = Runner::builder(pool, env)
-            .thread_count(2);
+        let builder = Runner::builder(pool, env).thread_count(2);
 
-        GuardBuilder {
-            builder,
-        }
+        GuardBuilder { builder }
     }
 }
 
 impl<'a> TestGuard<'a, Barrier> {
     pub fn barrier_runner(env: Barrier) -> Self {
-        Self::builder(env)
-            .register::<BarrierJob>()
-            .build()
+        Self::builder(env).register::<BarrierJob>().build()
     }
 }
 

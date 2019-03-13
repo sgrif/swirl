@@ -1,7 +1,7 @@
 pub use swirl::Job;
 
-use swirl::errors::PerformError;
 use serde::*;
+use swirl::errors::PerformError;
 
 use crate::sync::Barrier;
 

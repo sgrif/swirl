@@ -1,5 +1,5 @@
-use diesel::r2d2;
 use diesel::prelude::*;
+use diesel::r2d2;
 
 pub type DieselPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
 

@@ -15,9 +15,7 @@ fn run_all_pending_jobs_returns_when_all_jobs_enqueued() {
 
     runner.run_all_pending_jobs().unwrap();
 
-    let queued_job_count = background_jobs::table
-        .count()
-        .get_result(&conn);
+    let queued_job_count = background_jobs::table.count().get_result(&conn);
     let unlocked_job_count = background_jobs::table
         .select(background_jobs::id)
         .for_update()

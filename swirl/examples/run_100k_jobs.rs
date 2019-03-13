@@ -1,9 +1,9 @@
-use swirl::*;
-use serde::{Serialize, Deserialize};
-use std::error::Error;
-use diesel::r2d2;
-use std::time::Instant;
 use diesel::prelude::*;
+use diesel::r2d2;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::time::Instant;
+use swirl::*;
 
 #[derive(Serialize, Deserialize)]
 struct DummyJob;

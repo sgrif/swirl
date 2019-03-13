@@ -29,10 +29,7 @@ pub trait DieselPool<'a>: Clone + Send {
 
 /// A helper trait for `for<'a> DieselPool<'a>`
 pub trait DieselPoolOwned: for<'a> DieselPool<'a> {}
-impl<T> DieselPoolOwned for T
-where
-    for<'a> T: DieselPool<'a>,
-{}
+impl<T> DieselPoolOwned for T where for<'a> T: DieselPool<'a> {}
 
 #[cfg(feature = "r2d2")]
 mod r2d2_impl {
