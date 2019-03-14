@@ -116,7 +116,7 @@ where
                 self.run_single_job(sender.clone());
             }
 
-            pending_messages += 1;
+            pending_messages += jobs_to_queue;
             match receiver.recv() {
                 Ok(Event::Working) => pending_messages -= 1,
                 Ok(Event::NoJobAvailable) => return Ok(()),
