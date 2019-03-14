@@ -1,0 +1,31 @@
+trigger:
+- master
+
+variables:
+  DATABASE_URL: postgres://postgres:postgres@localhost/swirl_test
+  TEST_DATABASE_URL: postgres://postgres:postgres@localhost/swirl_test
+
+pool:
+  vmImage: Ubuntu-16.04
+
+steps:
+- script: |
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+    source ~/.cargo/env
+    echo "##vso[task.setvariable variable=PATH;]$PATH"
+  displayName: Install rustc
+
+- script: |
+    sudo apt-get update
+    sudo apt-get -y install postgresql libpq-dev
+    sudo -u postgres psql postgres -c "ALTER USER postgres PASSWORD 'postgres'"
+  displayName: Install PostgreSQL
+
+- script: cargo install diesel_cli --vers 1.4.0 --debug --no-default-features --features postgres
+  displayName: Install diesel
+
+- script: diesel database setup
+  displayName: Run migrations
+
+- script: cargo test
+  displayName: Run tests
