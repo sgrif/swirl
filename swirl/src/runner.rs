@@ -7,7 +7,7 @@ use threadpool::ThreadPool;
 
 use crate::db::*;
 use crate::errors::*;
-use crate::{storage, Job, Registry};
+use crate::{storage, Registry};
 use event::*;
 
 mod channel;
@@ -17,19 +17,10 @@ mod event;
 pub struct Builder<Env, ConnectionPool> {
     connection_pool: ConnectionPool,
     environment: Env,
-    registry: Registry<Env>,
     thread_count: Option<usize>,
 }
 
 impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
-    /// Register a job type to be run
-    ///
-    /// This function must be called for every job you intend to enqueue
-    pub fn register<T: Job<Environment = Env>>(mut self) -> Self {
-        self.registry.register::<T>();
-        self
-    }
-
     /// Set the number of threads to be used to run jobs concurrently.
     /// Defaults to 5
     pub fn thread_count(mut self, thread_count: usize) -> Self {
@@ -43,14 +34,14 @@ impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
             connection_pool: self.connection_pool,
             thread_pool: ThreadPool::new(self.thread_count.unwrap_or(5)),
             environment: Arc::new(self.environment),
-            registry: Arc::new(self.registry),
+            registry: Arc::new(Registry::load()),
         }
     }
 }
 
 #[allow(missing_debug_implementations)]
 /// The core runner responsible for locking and running jobs
-pub struct Runner<Env, ConnectionPool> {
+pub struct Runner<Env: 'static, ConnectionPool> {
     connection_pool: ConnectionPool,
     thread_pool: ThreadPool,
     environment: Arc<Env>,
@@ -71,7 +62,6 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
         Builder {
             connection_pool,
             environment,
-            registry: Registry::new(),
             thread_count: None,
         }
     }
@@ -133,10 +123,10 @@ where
         let environment = Arc::clone(&self.environment);
         let registry = Arc::clone(&self.registry);
         self.get_single_job(sender, move |job| {
-            let perform_fn = registry
+            let perform_job = registry
                 .get(&job.job_type)
                 .ok_or_else(|| PerformError::from(format!("Unknown job type {}", job.job_type)))?;
-            perform_fn(job.data, &environment)
+            perform_job.perform(job.data, &environment)
         })
     }
 

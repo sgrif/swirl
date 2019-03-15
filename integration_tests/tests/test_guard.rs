@@ -5,7 +5,6 @@ use std::sync::{Mutex, MutexGuard};
 use swirl::{Builder, Runner};
 
 use crate::db::*;
-use crate::dummy_jobs::*;
 use crate::sync::Barrier;
 use crate::util::*;
 
@@ -19,7 +18,7 @@ lazy_static::lazy_static! {
     static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-pub struct TestGuard<'a, Env> {
+pub struct TestGuard<'a, Env: 'static> {
     runner: Runner<Env, DieselPool>,
     _lock: MutexGuard<'a, ()>,
 }
@@ -41,11 +40,11 @@ impl<'a, Env> TestGuard<'a, Env> {
 
 impl<'a> TestGuard<'a, Barrier> {
     pub fn barrier_runner(env: Barrier) -> Self {
-        Self::builder(env).register::<BarrierJob>().build()
+        Self::builder(env).build()
     }
 }
 
-pub struct GuardBuilder<Env> {
+pub struct GuardBuilder<Env: 'static> {
     builder: Builder<Env, DieselPool>,
 }
 
@@ -55,11 +54,6 @@ impl<Env> GuardBuilder<Env> {
             _lock: TEST_MUTEX.lock().unwrap(),
             runner: self.builder.build(),
         }
-    }
-
-    pub fn register<T: Job<Environment = Env>>(mut self) -> Self {
-        self.builder = self.builder.register::<T>();
-        self
     }
 }
 

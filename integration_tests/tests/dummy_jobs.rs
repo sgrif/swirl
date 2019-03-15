@@ -20,3 +20,5 @@ impl Job for BarrierJob {
         Ok(())
     }
 }
+
+swirl::register_job!(BarrierJob);
