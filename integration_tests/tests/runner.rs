@@ -12,10 +12,10 @@ use crate::test_guard::TestGuard;
 #[test]
 fn run_all_pending_jobs_returns_when_all_jobs_enqueued() {
     let barrier = Barrier::new(3);
-    let runner = TestGuard::barrier_runner(barrier.clone());
+    let runner = TestGuard::runner(barrier.clone());
     let conn = runner.connection_pool().get().unwrap();
-    BarrierJob.enqueue(&conn).unwrap();
-    BarrierJob.enqueue(&conn).unwrap();
+    barrier_job().enqueue(&conn).unwrap();
+    barrier_job().enqueue(&conn).unwrap();
 
     runner.run_all_pending_jobs().unwrap();
 
@@ -36,10 +36,10 @@ fn run_all_pending_jobs_returns_when_all_jobs_enqueued() {
 #[test]
 fn assert_no_failed_jobs_blocks_until_all_queued_jobs_are_finished() {
     let barrier = Barrier::new(3);
-    let runner = TestGuard::barrier_runner(barrier.clone());
+    let runner = TestGuard::runner(barrier.clone());
     let conn = runner.connection_pool().get().unwrap();
-    BarrierJob.enqueue(&conn).unwrap();
-    BarrierJob.enqueue(&conn).unwrap();
+    barrier_job().enqueue(&conn).unwrap();
+    barrier_job().enqueue(&conn).unwrap();
 
     runner.run_all_pending_jobs().unwrap();
 
@@ -66,9 +66,9 @@ fn assert_no_failed_jobs_blocks_until_all_queued_jobs_are_finished() {
 fn assert_no_failed_jobs_panics_if_jobs_failed() {
     let runner = TestGuard::dummy_runner();
     let conn = runner.connection_pool().get().unwrap();
-    FailureJob.enqueue(&conn).unwrap();
-    FailureJob.enqueue(&conn).unwrap();
-    FailureJob.enqueue(&conn).unwrap();
+    failure_job().enqueue(&conn).unwrap();
+    failure_job().enqueue(&conn).unwrap();
+    failure_job().enqueue(&conn).unwrap();
 
     runner.run_all_pending_jobs().unwrap();
     runner.assert_no_failed_jobs().unwrap();
@@ -79,8 +79,8 @@ fn assert_no_failed_jobs_panics_if_jobs_failed() {
 fn panicking_jobs_are_caught_and_treated_as_failures() {
     let runner = TestGuard::dummy_runner();
     let conn = runner.connection_pool().get().unwrap();
-    PanicJob.enqueue(&conn).unwrap();
-    FailureJob.enqueue(&conn).unwrap();
+    panic_job().enqueue(&conn).unwrap();
+    failure_job().enqueue(&conn).unwrap();
 
     runner.run_all_pending_jobs().unwrap();
     runner.assert_no_failed_jobs().unwrap();
@@ -96,8 +96,8 @@ fn run_all_pending_jobs_errs_if_jobs_dont_start_in_timeout() {
         .job_start_timeout(Duration::from_millis(50))
         .build();
     let conn = runner.connection_pool().get().unwrap();
-    BarrierJob.enqueue(&conn).unwrap();
-    BarrierJob.enqueue(&conn).unwrap();
+    barrier_job().enqueue(&conn).unwrap();
+    barrier_job().enqueue(&conn).unwrap();
 
     let run_result = runner.run_all_pending_jobs();
     assert_matches!(run_result, Err(swirl::FetchError::NoMessageReceived));

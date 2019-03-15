@@ -6,4 +6,5 @@ mod sync;
 mod test_guard;
 mod util;
 
+mod codegen;
 mod runner;

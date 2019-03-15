@@ -6,7 +6,6 @@ use std::time::Duration;
 use swirl::{Builder, Runner};
 
 use crate::db::*;
-use crate::sync::Barrier;
 use crate::util::*;
 
 lazy_static::lazy_static! {
@@ -37,17 +36,15 @@ impl<'a, Env> TestGuard<'a, Env> {
 
         GuardBuilder { builder }
     }
+
+    pub fn runner(env: Env) -> Self {
+        Self::builder(env).build()
+    }
 }
 
 impl<'a> TestGuard<'a, ()> {
     pub fn dummy_runner() -> Self {
         Self::builder(()).build()
-    }
-}
-
-impl<'a> TestGuard<'a, Barrier> {
-    pub fn barrier_runner(env: Barrier) -> Self {
-        Self::builder(env).build()
     }
 }
 

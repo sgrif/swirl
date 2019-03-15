@@ -1,23 +1,13 @@
 use diesel::prelude::*;
 use diesel::r2d2;
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::time::Instant;
 use swirl::*;
 
-#[derive(Serialize, Deserialize)]
-struct DummyJob;
-
-impl Job for DummyJob {
-    type Environment = ();
-    const JOB_TYPE: &'static str = "DummyJob";
-
-    fn perform(self, _: &Self::Environment) -> Result<(), PerformError> {
-        Ok(())
-    }
+#[swirl::background_job]
+fn dummy_job() -> Result<(), PerformError> {
+    Ok(())
 }
-
-swirl::register_job!(DummyJob);
 
 fn main() -> Result<(), Box<dyn Error>> {
     let database_url = dotenv::var("DATABASE_URL")?;
@@ -45,7 +35,7 @@ fn enqueue_jobs(conn: &PgConnection) -> Result<(), EnqueueError> {
     use diesel::sql_query;
     sql_query("TRUNCATE TABLE background_jobs;").execute(conn)?;
     for _ in 0..100_000 {
-        DummyJob.enqueue(conn)?;
+        dummy_job().enqueue(conn)?;
     }
     Ok(())
 }

@@ -1,0 +1,18 @@
+[package]
+name = "swirl_proc_macro"
+version = "0.1.0"
+authors = ["Sean Griffin <sean@seantheprogrammer.com>"]
+description = "This library should not be used directly, it is re-exported through swirl"
+license = "MIT OR Apache-2.0"
+edition = "2018"
+
+[dependencies]
+syn = { version = "0.15.0", features = ["full", "extra-traits"] }
+quote = "0.6.0"
+proc-macro2 = "0.4.27"
+
+[lib]
+proc-macro = true
+
+[features]
+nightly = ["proc-macro2/nightly"]

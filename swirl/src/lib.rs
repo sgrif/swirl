@@ -15,6 +15,8 @@ mod storage;
 pub mod errors;
 pub mod schema;
 
+pub use swirl_proc_macro::*;
+
 pub use db::DieselPool;
 pub use errors::*;
 pub use job::*;
