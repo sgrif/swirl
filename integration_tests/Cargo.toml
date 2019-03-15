@@ -11,6 +11,7 @@ swirl = { path = "../swirl" }
 lazy_static = "1.0.0"
 serde = { version = "1.0.0", features = ["derive"] }
 dotenv = "0.11"
+antidote = "1.0.0"
 
 [[test]]
 name = "integration_tests"

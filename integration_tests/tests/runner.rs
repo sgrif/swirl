@@ -1,4 +1,7 @@
 use diesel::prelude::*;
+use std::sync::mpsc::sync_channel;
+use std::thread;
+use std::time::Duration;
 use swirl::schema::*;
 
 use crate::dummy_jobs::*;
@@ -30,7 +33,54 @@ fn run_all_pending_jobs_returns_when_all_jobs_enqueued() {
 }
 
 #[test]
-#[ignore]
-fn wait_for_jobs_blocks_until_all_queued_jobs_are_finished() {
-    panic!("pending")
+fn assert_no_failed_jobs_blocks_until_all_queued_jobs_are_finished() {
+    let barrier = Barrier::new(3);
+    let runner = TestGuard::barrier_runner(barrier.clone());
+    let conn = runner.connection_pool().get().unwrap();
+    BarrierJob.enqueue(&conn).unwrap();
+    BarrierJob.enqueue(&conn).unwrap();
+
+    runner.run_all_pending_jobs().unwrap();
+
+    let (send, recv) = sync_channel(0);
+    let handle = thread::spawn(move || {
+        let wait = Duration::from_millis(100);
+        assert!(
+            recv.recv_timeout(wait).is_err(),
+            "wait_for_jobs returned before jobs finished"
+        );
+
+        barrier.wait();
+
+        assert!(recv.recv().is_ok(), "wait_for_jobs didn't return");
+    });
+
+    runner.assert_no_failed_jobs().unwrap();
+    send.send(1).unwrap();
+    handle.join().unwrap();
+}
+
+#[test]
+#[should_panic(expected = "3 jobs failed")]
+fn assert_no_failed_jobs_panics_if_jobs_failed() {
+    let runner = TestGuard::dummy_runner();
+    let conn = runner.connection_pool().get().unwrap();
+    FailureJob.enqueue(&conn).unwrap();
+    FailureJob.enqueue(&conn).unwrap();
+    FailureJob.enqueue(&conn).unwrap();
+
+    runner.run_all_pending_jobs().unwrap();
+    runner.assert_no_failed_jobs().unwrap();
+}
+
+#[test]
+#[should_panic(expected = "2 jobs failed")]
+fn panicking_jobs_are_caught_and_treated_as_failures() {
+    let runner = TestGuard::dummy_runner();
+    let conn = runner.connection_pool().get().unwrap();
+    PanicJob.enqueue(&conn).unwrap();
+    FailureJob.enqueue(&conn).unwrap();
+
+    runner.run_all_pending_jobs().unwrap();
+    runner.assert_no_failed_jobs().unwrap();
 }

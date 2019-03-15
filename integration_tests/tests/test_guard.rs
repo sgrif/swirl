@@ -1,7 +1,7 @@
+use antidote::{Mutex, MutexGuard};
 use diesel::prelude::*;
 use diesel::r2d2;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Mutex, MutexGuard};
 use swirl::{Builder, Runner};
 
 use crate::db::*;
@@ -38,6 +38,12 @@ impl<'a, Env> TestGuard<'a, Env> {
     }
 }
 
+impl<'a> TestGuard<'a, ()> {
+    pub fn dummy_runner() -> Self {
+        Self::builder(()).build()
+    }
+}
+
 impl<'a> TestGuard<'a, Barrier> {
     pub fn barrier_runner(env: Barrier) -> Self {
         Self::builder(env).build()
@@ -51,7 +57,7 @@ pub struct GuardBuilder<Env: 'static> {
 impl<Env> GuardBuilder<Env> {
     pub fn build<'a>(self) -> TestGuard<'a, Env> {
         TestGuard {
-            _lock: TEST_MUTEX.lock().unwrap(),
+            _lock: TEST_MUTEX.lock(),
             runner: self.builder.build(),
         }
     }

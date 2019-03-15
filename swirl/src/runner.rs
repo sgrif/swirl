@@ -188,7 +188,7 @@ where
     pub fn assert_no_failed_jobs(&self) -> Result<(), Box<dyn Error>> {
         self.wait_for_jobs();
         let failed_jobs = storage::failed_job_count(&*self.connection()?)?;
-        assert_eq!(0, failed_jobs);
+        assert_eq!(0, failed_jobs, "{} jobs failed", failed_jobs);
         Ok(())
     }
 
