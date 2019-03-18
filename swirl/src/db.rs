@@ -31,7 +31,7 @@ pub trait DieselPool: Clone + Send + for<'a> BorrowedConnection<'a> {
     ///
     /// - A timeout was reached
     /// - An error occurred establishing a new connection
-    fn get<'a>(&'a self) -> Result<DieselPooledConn<'a, Self>, Self::Error>;
+    fn get(&self) -> Result<DieselPooledConn<'_, Self>, Self::Error>;
 }
 
 #[cfg(feature = "r2d2")]
