@@ -2,6 +2,7 @@ use antidote::{Mutex, MutexGuard};
 use diesel::prelude::*;
 use diesel::r2d2;
 use std::ops::{Deref, DerefMut};
+use std::time::Duration;
 use swirl::{Builder, Runner};
 
 use crate::db::*;
@@ -55,6 +56,16 @@ pub struct GuardBuilder<Env: 'static> {
 }
 
 impl<Env> GuardBuilder<Env> {
+    pub fn thread_count(mut self, count: usize) -> Self {
+        self.builder = self.builder.thread_count(count);
+        self
+    }
+
+    pub fn job_start_timeout(mut self, timeout: Duration) -> Self {
+        self.builder = self.builder.job_start_timeout(timeout);
+        self
+    }
+
     pub fn build<'a>(self) -> TestGuard<'a, Env> {
         TestGuard {
             _lock: TEST_MUTEX.lock(),

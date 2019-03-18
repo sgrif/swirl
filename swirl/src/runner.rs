@@ -3,6 +3,7 @@ use std::any::Any;
 use std::error::Error;
 use std::panic::{catch_unwind, PanicInfo, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use std::time::Duration;
 use threadpool::ThreadPool;
 
 use crate::db::*;
@@ -18,13 +19,24 @@ pub struct Builder<Env, ConnectionPool> {
     connection_pool: ConnectionPool,
     environment: Env,
     thread_count: Option<usize>,
+    job_start_timeout: Option<Duration>,
 }
 
 impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
     /// Set the number of threads to be used to run jobs concurrently.
+    ///
     /// Defaults to 5
     pub fn thread_count(mut self, thread_count: usize) -> Self {
         self.thread_count = Some(thread_count);
+        self
+    }
+
+    /// The amount of time to wait for a job to start before assuming an error
+    /// has occurred.
+    ///
+    /// Defaults to 10 seconds.
+    pub fn job_start_timeout(mut self, timeout: Duration) -> Self {
+        self.job_start_timeout = Some(timeout);
         self
     }
 
@@ -35,6 +47,7 @@ impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
             thread_pool: ThreadPool::new(self.thread_count.unwrap_or(5)),
             environment: Arc::new(self.environment),
             registry: Arc::new(Registry::load()),
+            job_start_timeout: self.job_start_timeout.unwrap_or(Duration::from_secs(10)),
         }
     }
 }
@@ -46,6 +59,7 @@ pub struct Runner<Env: 'static, ConnectionPool> {
     thread_pool: ThreadPool,
     environment: Arc<Env>,
     registry: Arc<Registry<Env>>,
+    job_start_timeout: Duration,
 }
 
 impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
@@ -63,6 +77,7 @@ impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
             connection_pool,
             environment,
             thread_count: None,
+            job_start_timeout: None,
         }
     }
 
@@ -107,7 +122,7 @@ where
             }
 
             pending_messages += jobs_to_queue;
-            match receiver.recv() {
+            match receiver.recv_timeout(self.job_start_timeout) {
                 Ok(Event::Working) => pending_messages -= 1,
                 Ok(Event::NoJobAvailable) => return Ok(()),
                 Ok(Event::ErrorLoadingJob(e)) => return Err(FetchError::FailedLoadingJob(e)),

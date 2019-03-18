@@ -1,3 +1,4 @@
+use assert_matches::assert_matches;
 use diesel::prelude::*;
 use std::sync::mpsc::sync_channel;
 use std::thread;
@@ -82,5 +83,27 @@ fn panicking_jobs_are_caught_and_treated_as_failures() {
     FailureJob.enqueue(&conn).unwrap();
 
     runner.run_all_pending_jobs().unwrap();
+    runner.assert_no_failed_jobs().unwrap();
+}
+
+#[test]
+fn run_all_pending_jobs_errs_if_jobs_dont_start_in_timeout() {
+    let barrier = Barrier::new(2);
+    // A runner with 1 thread where all jobs will hang indefinitely.
+    // The second job will never start.
+    let runner = TestGuard::builder(barrier.clone())
+        .thread_count(1)
+        .job_start_timeout(Duration::from_millis(50))
+        .build();
+    let conn = runner.connection_pool().get().unwrap();
+    BarrierJob.enqueue(&conn).unwrap();
+    BarrierJob.enqueue(&conn).unwrap();
+
+    let run_result = runner.run_all_pending_jobs();
+    assert_matches!(run_result, Err(swirl::FetchError::NoMessageReceived));
+
+    // Make sure the jobs actually run so we don't panic on drop
+    barrier.wait();
+    barrier.wait();
     runner.assert_no_failed_jobs().unwrap();
 }
