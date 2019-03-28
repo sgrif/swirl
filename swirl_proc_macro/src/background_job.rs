@@ -29,6 +29,16 @@ pub fn expand(item: syn::ItemFn) -> Result<TokenStream, Diagnostic> {
             }
         }
 
+        impl swirl::Job for Job {
+            type Environment = #env_type;
+            const JOB_TYPE: &'static str = stringify!(#name);
+
+            #fn_token perform(self, #env_pat: &Self::Environment) #return_type {
+                let Job { #(#arg_names),* } = self;
+                #(#body)*
+            }
+        }
+
         mod #name {
             use super::*;
 
@@ -36,16 +46,6 @@ pub fn expand(item: syn::ItemFn) -> Result<TokenStream, Diagnostic> {
             #[serde(crate = "swirl::serde")]
             pub struct Job {
                 #(#struct_def),*
-            }
-
-            impl swirl::Job for Job {
-                type Environment = #env_type;
-                const JOB_TYPE: &'static str = stringify!(#name);
-
-                #fn_token perform(self, #env_pat: &Self::Environment) #return_type {
-                    let Job { #(#arg_names),* } = self;
-                    #(#body)*
-                }
             }
 
             swirl::register_job!(Job);

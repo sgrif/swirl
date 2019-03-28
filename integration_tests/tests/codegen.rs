@@ -60,3 +60,25 @@ fn env_can_have_any_name() {
     runner.run_all_pending_jobs().unwrap();
     runner.assert_no_failed_jobs().unwrap();
 }
+
+#[test]
+#[forbid(unused_imports)]
+fn test_imports_only_used_in_job_body_are_not_warned_as_unused() {
+    use std::io::prelude::*;
+
+    #[swirl::background_job]
+    fn uses_trait_import() -> Result<(), swirl::PerformError> {
+        let mut buf = Vec::new();
+        buf.write_all(b"foo")?;
+        let s = String::from_utf8(buf)?;
+        assert_eq!(s, "foo");
+        Ok(())
+    }
+
+    let runner = TestGuard::dummy_runner();
+    let conn = runner.connection_pool().get().unwrap();
+    uses_trait_import().enqueue(&conn).unwrap();
+
+    runner.run_all_pending_jobs().unwrap();
+    runner.assert_no_failed_jobs().unwrap();
+}
