@@ -12,6 +12,7 @@ pub fn expand(item: syn::ItemFn) -> Result<TokenStream, Diagnostic> {
     let vis = job.visibility;
     let fn_token = job.fn_token;
     let name = job.name;
+    let env_pat = &job.args.env_pat;
     let env_type = &job.args.env_type;
     let fn_args = &job.args;
     let struct_def = job.args.struct_def();
@@ -40,7 +41,7 @@ pub fn expand(item: syn::ItemFn) -> Result<TokenStream, Diagnostic> {
                 type Environment = #env_type;
                 const JOB_TYPE: &'static str = stringify!(#name);
 
-                #fn_token perform(self, env: &Self::Environment) #return_type {
+                #fn_token perform(self, #env_pat: &Self::Environment) #return_type {
                     let Job { #(#arg_names),* } = self;
                     #(#body)*
                 }
@@ -131,6 +132,7 @@ impl BackgroundJob {
 }
 
 struct JobArgs {
+    env_pat: syn::Pat,
     env_type: syn::Type,
     args: Punctuated<syn::ArgCaptured, syn::Token![,]>,
 }
@@ -138,6 +140,7 @@ struct JobArgs {
 impl JobArgs {
     fn try_from(decl: syn::FnDecl) -> Result<Self, Diagnostic> {
         let mut first_arg = true;
+        let mut env_pat = syn::parse_quote!(_);
         let mut env_type = syn::parse_quote!(());
         let mut args = Punctuated::new();
 
@@ -172,6 +175,7 @@ impl JobArgs {
                     if let Some(mutable) = type_ref.mutability {
                         return Err(mutable.span.error("Unexpected `mut`"));
                     }
+                    env_pat = arg_captured.pat;
                     env_type = *type_ref.elem;
                     continue;
                 }
@@ -180,7 +184,7 @@ impl JobArgs {
             args.push(arg_captured);
         }
 
-        Ok(Self { env_type, args })
+        Ok(Self { env_pat, env_type, args })
     }
 
     fn struct_def(&self) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
