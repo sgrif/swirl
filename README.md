@@ -8,6 +8,10 @@ Swirl is a background work queue built on Diesel and PostgreSQL's row locking
 features. It was extracted from [crates.io](crates.io), which uses it for
 updating the index off the web server.
 
+This library is still in its early stages, and has not yet reached 0.1 status.
+We're using it successfully in production on crates.io today, but there are
+still several things missing that you may want from a job queue.
+
 ## Getting Started
 
 Swirl stores background jobs in your PostgreSQL 9.5+ database. As such, it has
@@ -101,10 +105,7 @@ that all jobs are idempotent.
 
 ## Upcoming features
 
-This library is still in its early stages, and has not yet reached 0.1 status.
-We're using it successfully in production on crates.io today, but there are
-still several things missing that you may want from a job queue. Planned
-features that are not yet implemented are:
+Planned features that are not yet implemented are:
 
 - Automatic configuration of the DB connection pool
 - Allowing jobs to take a database connection as an argument
