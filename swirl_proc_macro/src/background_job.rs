@@ -31,7 +31,8 @@ pub fn expand(item: syn::ItemFn) -> Result<TokenStream, Diagnostic> {
         mod #name {
             use super::*;
 
-            #[derive(serde::Serialize, serde::Deserialize)]
+            #[derive(swirl::Serialize, swirl::Deserialize)]
+            #[serde(crate = "swirl::serde")]
             pub struct Job {
                 #(#struct_def),*
             }

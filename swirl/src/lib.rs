@@ -5,6 +5,8 @@ extern crate diesel;
 
 #[doc(hidden)]
 pub extern crate inventory;
+#[doc(hidden)]
+pub extern crate serde;
 
 mod job;
 mod registry;
@@ -16,6 +18,9 @@ pub mod db;
 pub mod schema;
 
 pub use swirl_proc_macro::*;
+
+#[doc(hidden)]
+pub use serde_derive::{Serialize, Deserialize};
 
 pub use errors::*;
 pub use job::*;
