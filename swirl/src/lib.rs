@@ -11,8 +11,8 @@ mod registry;
 mod runner;
 mod storage;
 
-pub mod errors;
 pub mod db;
+pub mod errors;
 pub mod schema;
 
 pub use swirl_proc_macro::*;

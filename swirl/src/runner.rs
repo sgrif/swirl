@@ -162,7 +162,7 @@ where
                 }
             };
 
-            conn.transaction::<_, PerformError, _>(|| {
+            let job_run_result = conn.transaction::<_, diesel::result::Error, _>(|| {
                 let job = match storage::find_next_unlocked_job(&conn).optional() {
                     Ok(Some(j)) => {
                         sender.send(Event::Working);
@@ -174,7 +174,7 @@ where
                     }
                     Err(e) => {
                         sender.send(Event::ErrorLoadingJob(e));
-                        return Err(Box::new(RollbackTransaction));
+                        return Err(RollbackTransaction);
                     }
                 };
                 let job_id = job.id;
@@ -191,8 +191,14 @@ where
                     }
                 }
                 Ok(())
-            })
-            .expect("Could not retrieve or update job")
+            });
+
+            match job_run_result {
+                Ok(_) | Err(RollbackTransaction) => {}
+                Err(e) => {
+                    panic!("Failed to update job: {:?}", e);
+                }
+            }
         })
     }
 
