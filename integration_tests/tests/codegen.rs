@@ -1,10 +1,10 @@
 use crate::dummy_jobs::*;
 use crate::test_guard::TestGuard;
-use swirl::PerformError;
+use failure::Fallible;
+use swirl::{JobsFailed, PerformError};
 
 #[test]
-#[should_panic(expected = "1 jobs failed")]
-fn generated_jobs_serialize_all_arguments_except_first() {
+fn generated_jobs_serialize_all_arguments_except_first() -> Fallible<()> {
     #[swirl::background_job]
     fn check_arg_equal_to_env(env: &String, arg: String) -> Result<(), PerformError> {
         if env == &arg {
@@ -15,17 +15,17 @@ fn generated_jobs_serialize_all_arguments_except_first() {
     }
 
     let runner = TestGuard::runner("a".to_string());
-    let conn = runner.connection_pool().get().unwrap();
-    check_arg_equal_to_env("a".into()).enqueue(&conn).unwrap();
-    check_arg_equal_to_env("b".into()).enqueue(&conn).unwrap();
+    let conn = runner.connection_pool().get()?;
+    check_arg_equal_to_env("a".into()).enqueue(&conn)?;
+    check_arg_equal_to_env("b".into()).enqueue(&conn)?;
 
-    runner.run_all_pending_jobs().unwrap();
-    runner.assert_no_failed_jobs().unwrap();
+    runner.run_all_pending_jobs()?;
+    assert_eq!(Err(JobsFailed(1)), runner.check_for_failed_jobs());
+    Ok(())
 }
 
 #[test]
-#[should_panic(expected = "1 jobs failed")]
-fn jobs_with_args_but_no_env() {
+fn jobs_with_args_but_no_env() -> Fallible<()> {
     #[swirl::background_job]
     fn assert_foo(arg: String) -> Result<(), PerformError> {
         if arg == "foo" {
@@ -36,10 +36,11 @@ fn jobs_with_args_but_no_env() {
     }
 
     let runner = TestGuard::dummy_runner();
-    let conn = runner.connection_pool().get().unwrap();
-    assert_foo("foo".into()).enqueue(&conn).unwrap();
-    assert_foo("not foo".into()).enqueue(&conn).unwrap();
+    let conn = runner.connection_pool().get()?;
+    assert_foo("foo".into()).enqueue(&conn)?;
+    assert_foo("not foo".into()).enqueue(&conn)?;
 
-    runner.run_all_pending_jobs().unwrap();
-    runner.assert_no_failed_jobs().unwrap();
+    runner.run_all_pending_jobs()?;
+    assert_eq!(Err(JobsFailed(1)), runner.check_for_failed_jobs());
+    Ok(())
 }

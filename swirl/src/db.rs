@@ -21,7 +21,7 @@ pub trait BorrowedConnection<'a> {
 pub trait DieselPool: Clone + Send + for<'a> BorrowedConnection<'a> {
     /// The error type returned when a connection could not be retreived from
     /// the pool.
-    type Error: Error + Send + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     /// Attempt to get a database connection from the pool. Errors if a
     /// connection could not be retrieved from the pool.

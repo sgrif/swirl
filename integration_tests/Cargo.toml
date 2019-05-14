@@ -13,6 +13,7 @@ serde = { version = "1.0.0", features = ["derive"] }
 dotenv = "0.11"
 antidote = "1.0.0"
 assert_matches = "1.0.0"
+failure = { features = ["backtrace"] }
 
 [[test]]
 name = "integration_tests"
