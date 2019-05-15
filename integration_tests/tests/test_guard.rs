@@ -25,12 +25,14 @@ pub struct TestGuard<'a, Env: 'static> {
 
 impl<'a, Env> TestGuard<'a, Env> {
     pub fn builder(env: Env) -> GuardBuilder<Env> {
-        use dotenv;
+        Self::with_db_pool_size(env, 4)
+    }
 
+    pub fn with_db_pool_size(env: Env, pool_size: u32) -> GuardBuilder<Env> {
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
         let manager = r2d2::ConnectionManager::new(database_url);
-        let pool = pool_builder().build_unchecked(manager);
+        let pool = pool_builder(pool_size).build_unchecked(manager);
 
         let builder = Runner::builder(pool, env);
 
