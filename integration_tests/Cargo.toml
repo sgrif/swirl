@@ -9,7 +9,6 @@ autotests = false
 diesel = { version = "1.0.0", features = ["postgres", "r2d2"] }
 swirl = { path = "../swirl" }
 lazy_static = "1.0.0"
-serde = { version = "1.0.0", features = ["derive"] }
 dotenv = "0.11"
 antidote = "1.0.0"
 assert_matches = "1.0.0"
