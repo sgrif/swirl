@@ -44,3 +44,19 @@ fn jobs_with_args_but_no_env() -> Fallible<()> {
     assert_eq!(Err(JobsFailed(1)), runner.check_for_failed_jobs());
     Ok(())
 }
+
+#[test]
+fn env_can_have_any_name() {
+    #[swirl::background_job]
+    fn env_with_different_name(environment: &String) -> Result<(), swirl::PerformError> {
+        assert_eq!(environment, "my environment");
+        Ok(())
+    }
+
+    let runner = TestGuard::runner(String::from("my environment"));
+    let conn = runner.connection_pool().get().unwrap();
+    env_with_different_name().enqueue(&conn).unwrap();
+
+    runner.run_all_pending_jobs().unwrap();
+    runner.assert_no_failed_jobs().unwrap();
+}
