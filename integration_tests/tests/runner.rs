@@ -114,28 +114,27 @@ fn run_all_pending_jobs_errs_if_jobs_dont_start_in_timeout() -> Fallible<()> {
 }
 
 #[test]
-fn jobs_failing_to_load_doesnt_panic_threads() {
+fn jobs_failing_to_load_doesnt_panic_threads() -> Fallible<()> {
     let runner = TestGuard::with_db_pool_size((), 1).thread_count(1).build();
 
     {
-        let conn = runner.connection_pool().get().unwrap();
-        failure_job().enqueue(&conn).unwrap();
+        let conn = runner.connection_pool().get()?;
+        failure_job().enqueue(&conn)?;
         // Since jobs are loaded with `SELECT FOR UPDATE`, it will always fail in
         // read-only mode
         diesel::sql_query("SET default_transaction_read_only = 't'")
-            .execute(&conn)
-            .unwrap();
+            .execute(&conn)?;
     }
 
     let run_result = runner.run_all_pending_jobs();
 
     {
-        let conn = runner.connection_pool().get().unwrap();
+        let conn = runner.connection_pool().get()?;
         diesel::sql_query("SET default_transaction_read_only = 'f'")
-            .execute(&conn)
-            .unwrap();
+            .execute(&conn)?;
     }
 
     assert_matches!(run_result, Err(swirl::FetchError::FailedLoadingJob(_)));
-    runner.assert_no_failed_jobs().unwrap();
+    runner.check_for_failed_jobs()?;
+    Ok(())
 }
