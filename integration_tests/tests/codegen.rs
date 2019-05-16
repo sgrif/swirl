@@ -46,7 +46,7 @@ fn jobs_with_args_but_no_env() -> Fallible<()> {
 }
 
 #[test]
-fn env_can_have_any_name() {
+fn env_can_have_any_name() -> Fallible<()> {
     #[swirl::background_job]
     fn env_with_different_name(environment: &String) -> Result<(), swirl::PerformError> {
         assert_eq!(environment, "my environment");
@@ -54,16 +54,17 @@ fn env_can_have_any_name() {
     }
 
     let runner = TestGuard::runner(String::from("my environment"));
-    let conn = runner.connection_pool().get().unwrap();
-    env_with_different_name().enqueue(&conn).unwrap();
+    let conn = runner.connection_pool().get()?;
+    env_with_different_name().enqueue(&conn)?;
 
-    runner.run_all_pending_jobs().unwrap();
-    runner.assert_no_failed_jobs().unwrap();
+    runner.run_all_pending_jobs()?;
+    runner.check_for_failed_jobs()?;
+    Ok(())
 }
 
 #[test]
 #[forbid(unused_imports)]
-fn test_imports_only_used_in_job_body_are_not_warned_as_unused() {
+fn test_imports_only_used_in_job_body_are_not_warned_as_unused() -> Fallible<()> {
     use std::io::prelude::*;
 
     #[swirl::background_job]
@@ -76,9 +77,10 @@ fn test_imports_only_used_in_job_body_are_not_warned_as_unused() {
     }
 
     let runner = TestGuard::dummy_runner();
-    let conn = runner.connection_pool().get().unwrap();
-    uses_trait_import().enqueue(&conn).unwrap();
+    let conn = runner.connection_pool().get()?;
+    uses_trait_import().enqueue(&conn)?;
 
-    runner.run_all_pending_jobs().unwrap();
-    runner.assert_no_failed_jobs().unwrap();
+    runner.run_all_pending_jobs()?;
+    runner.check_for_failed_jobs()?;
+    Ok(())
 }

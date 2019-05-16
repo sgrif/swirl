@@ -29,12 +29,12 @@ pub fn expand(item: syn::ItemFn) -> Result<TokenStream, Diagnostic> {
             }
         }
 
-        impl swirl::Job for Job {
+        impl swirl::Job for #name :: Job {
             type Environment = #env_type;
             const JOB_TYPE: &'static str = stringify!(#name);
 
             #fn_token perform(self, #env_pat: &Self::Environment) #return_type {
-                let Job { #(#arg_names),* } = self;
+                let Self { #(#arg_names),* } = self;
                 #(#body)*
             }
         }
