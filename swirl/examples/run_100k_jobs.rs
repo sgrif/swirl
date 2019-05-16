@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let started = Instant::now();
 
     runner.run_all_pending_jobs()?;
-    runner.assert_no_failed_jobs()?;
+    runner.check_for_failed_jobs()?;
 
     let elapsed = started.elapsed();
     println!("Ran 100k jobs in {} seconds", elapsed.as_secs());

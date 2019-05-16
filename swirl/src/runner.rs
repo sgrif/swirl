@@ -202,20 +202,37 @@ where
         })
     }
 
-    fn connection(&self) -> Result<DieselPooledConn<ConnectionPool>, Box<dyn Error>> {
+    fn connection(&self) -> Result<DieselPooledConn<ConnectionPool>, Box<dyn Error + Send + Sync>> {
         self.connection_pool.get().map_err(Into::into)
     }
 
-    pub fn assert_no_failed_jobs(&self) -> Result<(), Box<dyn Error>> {
-        self.wait_for_jobs();
+    /// Waits for all running jobs to complete, and returns an error if any
+    /// failed
+    ///
+    /// This function is intended for use in tests. If any jobs have failed, it
+    /// will return `swirl::JobsFailed` with the number of jobs that failed.
+    ///
+    /// If any other unexpected errors occurred, such as panicked worker threads
+    /// or an error loading the job count from the database, an opaque error
+    /// will be returned.
+    pub fn check_for_failed_jobs(&self) -> Result<(), FailedJobsError> {
+        self.wait_for_jobs()?;
         let failed_jobs = storage::failed_job_count(&*self.connection()?)?;
-        assert_eq!(0, failed_jobs, "{} jobs failed", failed_jobs);
-        Ok(())
+        if failed_jobs == 0 {
+            Ok(())
+        } else {
+            Err(JobsFailed(failed_jobs))
+        }
     }
 
-    fn wait_for_jobs(&self) {
+    fn wait_for_jobs(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.thread_pool.join();
-        assert_eq!(0, self.thread_pool.panic_count());
+        let panic_count = self.thread_pool.panic_count();
+        if panic_count == 0 {
+            Ok(())
+        } else {
+            Err(format!("{} threads panicked", panic_count).into())
+        }
     }
 }
 
@@ -273,7 +290,7 @@ mod tests {
             Ok(())
         });
 
-        runner.wait_for_jobs();
+        runner.wait_for_jobs().unwrap();
     }
 
     #[test]
@@ -284,7 +301,7 @@ mod tests {
         create_dummy_job(&runner);
 
         runner.get_single_job(channel::dummy_sender(), |_| Ok(()));
-        runner.wait_for_jobs();
+        runner.wait_for_jobs().unwrap();
 
         let remaining_jobs = background_jobs
             .count()
@@ -331,7 +348,7 @@ mod tests {
             .unwrap();
         assert_eq!(1, total_jobs_including_failed.len());
 
-        runner.wait_for_jobs();
+        runner.wait_for_jobs().unwrap();
     }
 
     #[test]
@@ -341,7 +358,7 @@ mod tests {
         let job_id = create_dummy_job(&runner).id;
 
         runner.get_single_job(channel::dummy_sender(), |_| panic!());
-        runner.wait_for_jobs();
+        runner.wait_for_jobs().unwrap();
 
         let tries = background_jobs
             .find(job_id)
