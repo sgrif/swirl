@@ -398,8 +398,6 @@ mod tests {
     type Runner<Env> = crate::Runner<Env, r2d2::Pool<r2d2::ConnectionManager<PgConnection>>>;
 
     fn runner() -> Runner<()> {
-        use dotenv;
-
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
         let manager = r2d2::ConnectionManager::new(database_url);
