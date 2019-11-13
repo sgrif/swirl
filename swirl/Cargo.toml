@@ -23,3 +23,4 @@ num_cpus = "1.0"
 [features]
 default = ["r2d2"]
 r2d2 = ["diesel/r2d2"]
+nightly = ["swirl_proc_macro/nightly"]
