@@ -2,9 +2,9 @@ use diesel::prelude::*;
 use diesel::r2d2;
 
 pub type DieselPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
-pub type PoolBuilder = r2d2::Builder<r2d2::ConnectionManager<PgConnection>>;
+pub type PoolBuilder = swirl::db::R2d2Builder;
 
-pub fn pool_builder() -> PoolBuilder {
+pub fn pool_builder() -> r2d2::Builder<r2d2::ConnectionManager<PgConnection>> {
     r2d2::Pool::builder()
         .min_idle(Some(0))
         .connection_customizer(Box::new(SetStatementTimeout(1000)))

@@ -26,7 +26,7 @@ impl<'a, Env> TestGuard<'a, Env> {
     pub fn builder(env: Env) -> GuardBuilder<Env> {
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
-        let builder = Runner::builder(database_url, env).connection_pool_builder(pool_builder());
+        let builder = Runner::builder(env).connection_pool_builder(database_url, pool_builder());
 
         GuardBuilder { builder }
     }

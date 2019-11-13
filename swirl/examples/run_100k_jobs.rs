@@ -11,7 +11,7 @@ fn dummy_job() -> Result<(), PerformError> {
 fn main() -> Result<(), Box<dyn Error>> {
     let database_url = dotenv::var("DATABASE_URL")?;
     println!("Enqueuing 100k jobs");
-    let runner = Runner::builder(database_url, ()).build();
+    let runner = Runner::builder(()).database_url(database_url).build();
     enqueue_jobs(&*runner.connection_pool().get()?).unwrap();
     println!("Running jobs");
     let started = Instant::now();
