@@ -34,18 +34,6 @@ pub trait DieselPool: Clone + Send + for<'a> BorrowedConnection<'a> {
     fn get(&self) -> Result<DieselPooledConn<'_, Self>, Self::Error>;
 }
 
-/// A builder for connection pools
-pub trait DieselPoolBuilder {
-    /// The concrete connection pool built by this type
-    type Pool: DieselPool;
-
-    /// Sets the maximum size of the connection pool.
-    fn max_size(self, max_size: u32) -> Self;
-
-    /// Build the pool
-    fn build(self, database_url: String) -> Self::Pool;
-}
-
 #[cfg(feature = "r2d2")]
 mod r2d2_impl {
     use super::*;
@@ -65,16 +53,34 @@ mod r2d2_impl {
         }
     }
 
-    impl DieselPoolBuilder for r2d2::Builder<ConnectionManager> {
-        type Pool = r2d2::Pool<ConnectionManager>;
+    pub struct R2d2Builder {
+        url: String,
+        builder: r2d2::Builder<ConnectionManager>,
+        connection_count: Option<u32>,
+    }
 
-        fn max_size(self, max_size: u32) -> Self {
-            self.max_size(max_size)
+    impl R2d2Builder {
+        pub(crate) fn new(url: String, builder: r2d2::Builder<ConnectionManager>) -> Self {
+            Self {
+                url,
+                builder,
+                connection_count: None,
+            }
         }
 
-        fn build(self, database_url: String) -> Self::Pool {
-            let manager = ConnectionManager::new(database_url);
-            self.build_unchecked(manager)
+        pub(crate) fn connection_count(&mut self, connection_count: u32) {
+            self.connection_count = Some(connection_count);
+        }
+
+        pub(crate) fn build(self, default_connection_count: u32) -> r2d2::Pool<ConnectionManager> {
+            let max_size = self.connection_count.unwrap_or(default_connection_count);
+            self.builder
+                .max_size(max_size)
+                .build_unchecked(ConnectionManager::new(self.url))
         }
     }
 }
+
+#[cfg(feature = "r2d2")]
+#[doc(hidden)]
+pub use self::r2d2_impl::R2d2Builder;
