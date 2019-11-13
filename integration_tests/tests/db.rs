@@ -2,10 +2,10 @@ use diesel::prelude::*;
 use diesel::r2d2;
 
 pub type DieselPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
+pub type PoolBuilder = r2d2::Builder<r2d2::ConnectionManager<PgConnection>>;
 
-pub fn pool_builder(max_size: u32) -> r2d2::Builder<r2d2::ConnectionManager<PgConnection>> {
+pub fn pool_builder() -> PoolBuilder {
     r2d2::Pool::builder()
-        .max_size(max_size)
         .min_idle(Some(0))
         .connection_customizer(Box::new(SetStatementTimeout(1000)))
 }

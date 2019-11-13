@@ -1,6 +1,5 @@
 use antidote::{Mutex, MutexGuard};
 use diesel::prelude::*;
-use diesel::r2d2;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 use swirl::{Builder, Runner};
@@ -25,16 +24,9 @@ pub struct TestGuard<'a, Env: 'static> {
 
 impl<'a, Env> TestGuard<'a, Env> {
     pub fn builder(env: Env) -> GuardBuilder<Env> {
-        Self::with_db_pool_size(env, 4)
-    }
-
-    pub fn with_db_pool_size(env: Env, pool_size: u32) -> GuardBuilder<Env> {
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
-        let manager = r2d2::ConnectionManager::new(database_url);
-        let pool = pool_builder(pool_size).build_unchecked(manager);
-
-        let builder = Runner::builder(pool, env);
+        let builder = Runner::builder(database_url, env).connection_pool_builder(pool_builder());
 
         GuardBuilder { builder }
     }
@@ -51,12 +43,17 @@ impl<'a> TestGuard<'a, ()> {
 }
 
 pub struct GuardBuilder<Env: 'static> {
-    builder: Builder<Env, DieselPool>,
+    builder: Builder<Env, PoolBuilder>,
 }
 
 impl<Env> GuardBuilder<Env> {
     pub fn thread_count(mut self, count: usize) -> Self {
         self.builder = self.builder.thread_count(count);
+        self
+    }
+
+    pub fn connection_count(mut self, count: u32) -> Self {
+        self.builder = self.builder.connection_count(count);
         self
     }
 

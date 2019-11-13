@@ -1,5 +1,4 @@
 use diesel::prelude::*;
-use diesel::r2d2;
 use std::error::Error;
 use std::time::Instant;
 use swirl::*;
@@ -11,14 +10,9 @@ fn dummy_job() -> Result<(), PerformError> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let database_url = dotenv::var("DATABASE_URL")?;
-    let num_cpus = num_cpus::get();
-    let connection_manager = r2d2::ConnectionManager::new(database_url);
-    let connection_pool = r2d2::Pool::builder()
-        .max_size(num_cpus as u32)
-        .build(connection_manager)?;
     println!("Enqueuing 100k jobs");
-    enqueue_jobs(&*connection_pool.get()?).unwrap();
-    let runner = Runner::builder(connection_pool, ()).build();
+    let runner = Runner::builder(database_url, ()).build();
+    enqueue_jobs(&*runner.connection_pool().get()?).unwrap();
     println!("Running jobs");
     let started = Instant::now();
 

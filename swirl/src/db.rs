@@ -34,6 +34,18 @@ pub trait DieselPool: Clone + Send + for<'a> BorrowedConnection<'a> {
     fn get(&self) -> Result<DieselPooledConn<'_, Self>, Self::Error>;
 }
 
+/// A builder for connection pools
+pub trait DieselPoolBuilder {
+    /// The concrete connection pool built by this type
+    type Pool: DieselPool;
+
+    /// Sets the maximum size of the connection pool.
+    fn max_size(self, max_size: u32) -> Self;
+
+    /// Build the pool
+    fn build(self, database_url: String) -> Self::Pool;
+}
+
 #[cfg(feature = "r2d2")]
 mod r2d2_impl {
     use super::*;
@@ -50,6 +62,19 @@ mod r2d2_impl {
 
         fn get<'a>(&'a self) -> Result<DieselPooledConn<'a, Self>, Self::Error> {
             self.get()
+        }
+    }
+
+    impl DieselPoolBuilder for r2d2::Builder<ConnectionManager> {
+        type Pool = r2d2::Pool<ConnectionManager>;
+
+        fn max_size(self, max_size: u32) -> Self {
+            self.max_size(max_size)
+        }
+
+        fn build(self, database_url: String) -> Self::Pool {
+            let manager = ConnectionManager::new(database_url);
+            self.build_unchecked(manager)
         }
     }
 }
