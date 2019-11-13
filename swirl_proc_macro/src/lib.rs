@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![recursion_limit = "128"]
+#![cfg_attr(feature = "nightly", feature(proc_macro_diagnostic))]
 
 extern crate proc_macro;
 

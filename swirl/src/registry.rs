@@ -58,7 +58,7 @@ macro_rules! register_job {
 pub struct JobVTable {
     env_type: TypeId,
     job_type: &'static str,
-    perform: fn(serde_json::Value, &Any) -> Result<(), PerformError>,
+    perform: fn(serde_json::Value, &dyn Any) -> Result<(), PerformError>,
 }
 
 inventory::collect!(JobVTable);
@@ -73,7 +73,7 @@ impl JobVTable {
     }
 }
 
-fn perform_job<T: Job>(data: serde_json::Value, env: &Any) -> Result<(), PerformError> {
+fn perform_job<T: Job>(data: serde_json::Value, env: &dyn Any) -> Result<(), PerformError> {
     let environment = env.downcast_ref().ok_or_else::<PerformError, _>(|| {
         "Incorrect environment type. This should never happen. \
          Please open an issue at https://github.com/sgrif/swirl/issues/new"

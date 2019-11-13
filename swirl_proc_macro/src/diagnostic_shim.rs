@@ -7,7 +7,7 @@ pub trait DiagnosticShim {
 #[cfg(feature = "nightly")]
 impl DiagnosticShim for Span {
     fn error<T: Into<String>>(self, msg: T) -> Diagnostic {
-        self.unstable().error(self, msg)
+        self.unstable().error(msg)
     }
 }
 
