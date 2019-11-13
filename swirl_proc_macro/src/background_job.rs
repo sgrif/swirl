@@ -185,7 +185,11 @@ impl JobArgs {
             args.push(arg_captured);
         }
 
-        Ok(Self { env_pat, env_type, args })
+        Ok(Self {
+            env_pat,
+            env_type,
+            args,
+        })
     }
 
     fn struct_def(&self) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {

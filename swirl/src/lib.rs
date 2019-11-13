@@ -20,7 +20,7 @@ pub mod schema;
 pub use swirl_proc_macro::*;
 
 #[doc(hidden)]
-pub use serde_derive::{Serialize, Deserialize};
+pub use serde_derive::{Deserialize, Serialize};
 
 pub use errors::*;
 pub use job::*;

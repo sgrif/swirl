@@ -122,16 +122,14 @@ fn jobs_failing_to_load_doesnt_panic_threads() -> Fallible<()> {
         failure_job().enqueue(&conn)?;
         // Since jobs are loaded with `SELECT FOR UPDATE`, it will always fail in
         // read-only mode
-        diesel::sql_query("SET default_transaction_read_only = 't'")
-            .execute(&conn)?;
+        diesel::sql_query("SET default_transaction_read_only = 't'").execute(&conn)?;
     }
 
     let run_result = runner.run_all_pending_jobs();
 
     {
         let conn = runner.connection_pool().get()?;
-        diesel::sql_query("SET default_transaction_read_only = 'f'")
-            .execute(&conn)?;
+        diesel::sql_query("SET default_transaction_read_only = 'f'").execute(&conn)?;
     }
 
     assert_matches!(run_result, Err(swirl::FetchError::FailedLoadingJob(_)));
