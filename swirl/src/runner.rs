@@ -14,20 +14,34 @@ use event::*;
 mod channel;
 mod event;
 
+pub struct NoConnectionPoolGiven;
+
 #[allow(missing_debug_implementations)]
-pub struct Builder<Env, ConnectionPool> {
-    connection_pool: ConnectionPool,
+pub struct Builder<Env, ConnectionPoolBuilder> {
+    database_url: String,
+    connection_pool_builder: ConnectionPoolBuilder,
     environment: Env,
     thread_count: Option<usize>,
+    connection_count: Option<u32>,
     job_start_timeout: Option<Duration>,
 }
 
-impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
+impl<Env, ConnectionPoolBuilder> Builder<Env, ConnectionPoolBuilder> {
     /// Set the number of threads to be used to run jobs concurrently.
     ///
     /// Defaults to 5
     pub fn thread_count(mut self, thread_count: usize) -> Self {
         self.thread_count = Some(thread_count);
+        self
+    }
+
+    /// Set the maximum size of the database connection pool.
+    ///
+    /// Defaults to 2 * thread_count. This default is the optimal size if all
+    /// jobs will use exactly one database connection. If not all jobs require
+    /// a database connection, you may want to set this to a lower number.
+    pub fn connection_count(mut self, connection_count: u32) -> Self {
+        self.connection_count = Some(connection_count);
         self
     }
 
@@ -39,12 +53,56 @@ impl<Env, ConnectionPool> Builder<Env, ConnectionPool> {
         self.job_start_timeout = Some(timeout);
         self
     }
+}
 
+impl<Env> Builder<Env, NoConnectionPoolGiven> {
+    /// Provide a connection pool builder.
+    ///
+    /// You should call this method if you want to provide additional
+    /// configuration for the database connection pool. The builder will be
+    /// configured to have its max size set to the value given to
+    /// [`connection_count`](#method.connection_count).
+    pub fn connection_pool_builder<PoolBuilder>(
+        self,
+        builder: PoolBuilder,
+    ) -> Builder<Env, PoolBuilder> {
+        Builder {
+            database_url: self.database_url,
+            connection_pool_builder: builder,
+            environment: self.environment,
+            thread_count: self.thread_count,
+            connection_count: self.connection_count,
+            job_start_timeout: self.job_start_timeout,
+        }
+    }
+
+    #[cfg(feature = "r2d2")]
+    /// Build the runner with an r2d2 connection pool
+    pub fn build(
+        self,
+    ) -> Runner<Env, diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>> {
+        self.connection_pool_builder(diesel::r2d2::Builder::new())
+            .build()
+    }
+}
+
+impl<Env, ConnectionPoolBuilder> Builder<Env, ConnectionPoolBuilder>
+where
+    ConnectionPoolBuilder: DieselPoolBuilder,
+{
     /// Build the runner
-    pub fn build(self) -> Runner<Env, ConnectionPool> {
+    pub fn build(self) -> Runner<Env, ConnectionPoolBuilder::Pool> {
+        let thread_count = self.thread_count.unwrap_or(5);
+        let connection_pool_size = self
+            .connection_count
+            .unwrap_or_else(|| thread_count as u32 * 2);
+        let connection_pool = self
+            .connection_pool_builder
+            .max_size(connection_pool_size)
+            .build(self.database_url);
         Runner {
-            connection_pool: self.connection_pool,
-            thread_pool: ThreadPool::new(self.thread_count.unwrap_or(5)),
+            connection_pool: connection_pool,
+            thread_pool: ThreadPool::new(thread_count),
             environment: Arc::new(self.environment),
             registry: Arc::new(Registry::load()),
             job_start_timeout: self.job_start_timeout.unwrap_or(Duration::from_secs(10)),
@@ -62,25 +120,29 @@ pub struct Runner<Env: 'static, ConnectionPool> {
     job_start_timeout: Duration,
 }
 
-impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
+impl<Env> Runner<Env, NoConnectionPoolGiven> {
     /// Create a builder for a job runner
     ///
     /// This method takes the two required configurations, the database
     /// connection pool, and the environment to pass to your jobs. If your
     /// environment contains a connection pool, it should be the same pool given
     /// here.
-    pub fn builder(
-        connection_pool: ConnectionPool,
+    pub fn builder<S: Into<String>>(
+        database_url: S,
         environment: Env,
-    ) -> Builder<Env, ConnectionPool> {
+    ) -> Builder<Env, NoConnectionPoolGiven> {
         Builder {
-            connection_pool,
+            database_url: database_url.into(),
+            connection_pool_builder: NoConnectionPoolGiven,
             environment,
             thread_count: None,
+            connection_count: None,
             job_start_timeout: None,
         }
     }
+}
 
+impl<Env, ConnectionPool> Runner<Env, ConnectionPool> {
     #[doc(hidden)]
     /// For use in integration tests
     pub fn connection_pool(&self) -> &ConnectionPool {
@@ -400,13 +462,10 @@ mod tests {
     fn runner() -> Runner<()> {
         let database_url =
             dotenv::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set to run tests");
-        let manager = r2d2::ConnectionManager::new(database_url);
-        let pool = r2d2::Pool::builder()
-            .max_size(4)
-            .min_idle(Some(0))
-            .build_unchecked(manager);
 
-        Runner::builder(pool, ()).thread_count(2).build()
+        crate::Runner::builder(database_url, ())
+            .thread_count(2)
+            .build()
     }
 
     fn create_dummy_job(runner: &Runner<()>) -> storage::BackgroundJob {

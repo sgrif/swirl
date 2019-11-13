@@ -115,7 +115,10 @@ fn run_all_pending_jobs_errs_if_jobs_dont_start_in_timeout() -> Fallible<()> {
 
 #[test]
 fn jobs_failing_to_load_doesnt_panic_threads() -> Fallible<()> {
-    let runner = TestGuard::with_db_pool_size((), 1).thread_count(1).build();
+    let runner = TestGuard::builder(())
+        .thread_count(1)
+        .connection_count(1)
+        .build();
 
     {
         let conn = runner.connection_pool().get()?;
