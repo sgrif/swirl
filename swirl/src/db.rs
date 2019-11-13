@@ -34,6 +34,48 @@ pub trait DieselPool: Clone + Send + for<'a> BorrowedConnection<'a> {
     fn get(&self) -> Result<DieselPooledConn<'_, Self>, Self::Error>;
 }
 
+/// Object safe version of [`DieselPool`]
+pub trait DieselPoolObj {
+    /// Object safe version of [`DieselPool::get`]
+    ///
+    /// This function will heap allocate the connection. This allocation can
+    /// be avoided by using [`Self::with_connection`]
+    fn get(&self) -> Result<Box<dyn Deref<Target = PgConnection> + '_>, Box<dyn Error>>;
+
+    fn with_connection(
+        &self,
+        f: &dyn Fn(&PgConnection) -> Result<(), Box<dyn Error>>,
+    ) -> Result<(), Box<dyn Error>>;
+}
+
+impl<T: DieselPool> DieselPoolObj for T {
+    fn get(&self) -> Result<Box<dyn Deref<Target = PgConnection> + '_>, Box<dyn Error>> {
+        DieselPool::get(self)
+            .map(|v| Box::new(v) as _)
+            .map_err(|v| Box::new(v) as _)
+    }
+
+    fn with_connection(
+        &self,
+        f: &dyn Fn(&PgConnection) -> Result<(), Box<dyn Error>>,
+    ) -> Result<(), Box<dyn Error>> {
+        let conn = DieselPool::get(self)?;
+        f(&conn)
+    }
+}
+
+/// A builder for connection pools
+pub trait DieselPoolBuilder {
+    /// The concrete connection pool built by this type
+    type Pool: DieselPool;
+
+    /// Sets the maximum size of the connection pool.
+    fn max_size(self, max_size: u32) -> Self;
+
+    /// Build the pool
+    fn build(self, database_url: String) -> Self::Pool;
+}
+
 #[cfg(feature = "r2d2")]
 mod r2d2_impl {
     use super::*;

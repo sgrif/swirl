@@ -1,6 +1,7 @@
 use diesel::PgConnection;
 use serde::{de::DeserializeOwned, Serialize};
 
+use crate::db::DieselPoolObj;
 use crate::errors::{EnqueueError, PerformError};
 use crate::storage;
 
@@ -22,5 +23,6 @@ pub trait Job: Serialize + DeserializeOwned {
     }
 
     /// The logic involved in actually performing this job.
-    fn perform(self, env: &Self::Environment) -> Result<(), PerformError>;
+    fn perform(self, env: &Self::Environment, pool: &dyn DieselPoolObj)
+        -> Result<(), PerformError>;
 }

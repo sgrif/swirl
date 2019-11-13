@@ -1,6 +1,8 @@
 use crate::dummy_jobs::*;
 use crate::test_guard::TestGuard;
+use diesel::prelude::*;
 use failure::Fallible;
+use swirl::db::DieselPoolObj;
 use swirl::{JobsFailed, PerformError};
 
 #[test]
@@ -79,6 +81,63 @@ fn test_imports_only_used_in_job_body_are_not_warned_as_unused() -> Fallible<()>
     let runner = TestGuard::dummy_runner();
     let conn = runner.connection_pool().get()?;
     uses_trait_import().enqueue(&conn)?;
+
+    runner.run_all_pending_jobs()?;
+    runner.check_for_failed_jobs()?;
+    Ok(())
+}
+
+#[test]
+fn jobs_can_take_a_connection_as_an_argument() -> Fallible<()> {
+    use diesel::sql_query;
+
+    #[swirl::background_job]
+    fn takes_env_and_conn(_env: &(), conn: &PgConnection) -> Result<(), swirl::PerformError> {
+        sql_query("SELECT 1").execute(conn)?;
+        Ok(())
+    }
+
+    #[swirl::background_job]
+    fn takes_only_conn(conn: &PgConnection) -> Result<(), swirl::PerformError> {
+        sql_query("SELECT 1").execute(conn)?;
+        Ok(())
+    }
+
+    #[swirl::background_job]
+    fn takes_connection_pool(pool: &dyn DieselPoolObj) -> Result<(), swirl::PerformError> {
+        let conn1 = pool.get()?;
+        let conn2 = pool.get()?;
+        sql_query("SELECT 1").execute(&**conn1)?;
+        sql_query("SELECT 1").execute(&**conn2)?;
+        Ok(())
+    }
+
+    #[swirl::background_job]
+    fn takes_fully_qualified_conn(conn: &diesel::PgConnection) -> Result<(), swirl::PerformError> {
+        sql_query("SELECT 1").execute(conn)?;
+        Ok(())
+    }
+
+    #[swirl::background_job]
+    fn takes_fully_qualified_pool(
+        pool: &dyn swirl::db::DieselPoolObj,
+    ) -> Result<(), swirl::PerformError> {
+        let conn1 = pool.get()?;
+        let conn2 = pool.get()?;
+        sql_query("SELECT 1").execute(&**conn1)?;
+        sql_query("SELECT 1").execute(&**conn2)?;
+        Ok(())
+    }
+
+    let runner = TestGuard::dummy_runner();
+    {
+        let conn = runner.connection_pool().get()?;
+        takes_env_and_conn().enqueue(&conn)?;
+        takes_only_conn().enqueue(&conn)?;
+        takes_connection_pool().enqueue(&conn)?;
+        takes_fully_qualified_conn().enqueue(&conn)?;
+        takes_fully_qualified_pool().enqueue(&conn)?;
+    }
 
     runner.run_all_pending_jobs()?;
     runner.check_for_failed_jobs()?;

@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use diesel::r2d2;
 use std::any::Any;
 use std::error::Error;
-use std::panic::{catch_unwind, PanicInfo, RefUnwindSafe, UnwindSafe};
+use std::panic::{catch_unwind, AssertUnwindSafe, PanicInfo, RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use std::time::Duration;
 use threadpool::ThreadPool;
@@ -210,11 +210,13 @@ where
     fn run_single_job(&self, sender: EventSender<ConnectionPool>) {
         let environment = Arc::clone(&self.environment);
         let registry = Arc::clone(&self.registry);
+        // FIXME: https://github.com/sfackler/r2d2/pull/70
+        let connection_pool = AssertUnwindSafe(self.connection_pool().clone());
         self.get_single_job(sender, move |job| {
             let perform_job = registry
                 .get(&job.job_type)
                 .ok_or_else(|| PerformError::from(format!("Unknown job type {}", job.job_type)))?;
-            perform_job.perform(job.data, &environment)
+            perform_job.perform(job.data, &environment, &connection_pool.0)
         })
     }
 
