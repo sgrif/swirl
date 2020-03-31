@@ -54,7 +54,7 @@ Note that all jobs must use the same type for the environment.
 Once a job is defined, it can be enqueued like so:
 
 ```rust
-resize_image(file_name, dimensions).enquque(&diesel_connection)?
+resize_image(file_name, dimensions).enqueue(&diesel_connection)?
 ```
 
 You do not pass the environment when enqueuing jobs.
