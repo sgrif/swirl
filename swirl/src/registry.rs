@@ -23,7 +23,9 @@ impl<Env: 'static> Registry<Env> {
     pub fn load() -> Self {
         let jobs = inventory::iter::<JobVTable>
             .into_iter()
-            .filter(|vtable| vtable.env_type == TypeId::of::<Env>())
+            .filter(|vtable| {
+                vtable.env_type == TypeId::of::<Env>() || vtable.env_type == TypeId::of::<()>()
+            })
             .map(|&vtable| (vtable.job_type, vtable))
             .collect();
 
@@ -101,6 +103,10 @@ impl<Env: 'static> PerformJob<Env> {
         pool: &dyn DieselPoolObj,
     ) -> Result<(), PerformError> {
         let perform_fn = self.vtable.perform;
-        perform_fn(data, env, pool)
+        if self.vtable.env_type == TypeId::of::<()>() {
+            perform_fn(data, &(), pool)
+        } else {
+            perform_fn(data, env, pool)
+        }
     }
 }

@@ -108,9 +108,10 @@ impl BackgroundJob {
         }
 
         if let Some(where_clause) = sig.generics.where_clause {
-            return Err(where_clause.where_token.span.error(
-                "#[swirl::background_job] cannot be used on functions with a where clause",
-            ));
+            return Err(where_clause
+                .where_token
+                .span
+                .error("#[swirl::background_job] cannot be used on functions with a where clause"));
         }
 
         let fn_token = sig.fn_token;
