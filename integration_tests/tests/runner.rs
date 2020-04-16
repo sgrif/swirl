@@ -139,3 +139,31 @@ fn jobs_failing_to_load_doesnt_panic_threads() -> Fallible<()> {
     runner.check_for_failed_jobs()?;
     Ok(())
 }
+
+#[test]
+fn jobs_with_no_environment_can_be_run_from_a_runner_with_environment() -> Fallible<()> {
+    use swirl::PerformError;
+
+    pub struct Environment;
+
+    #[swirl::background_job]
+    fn takes_db_conn(_conn: &PgConnection) -> Result<(), PerformError> {
+        Ok(())
+    }
+
+    #[swirl::background_job]
+    fn takes_env(_env: &Environment) -> Result<(), PerformError> {
+        Ok(())
+    }
+
+    let runner = TestGuard::builder(Environment).build();
+    {
+        let conn = runner.connection_pool().get()?;
+        takes_db_conn().enqueue(&conn)?;
+        takes_env().enqueue(&conn)?;
+    }
+
+    runner.run_all_pending_jobs()?;
+    runner.check_for_failed_jobs()?;
+    Ok(())
+}
