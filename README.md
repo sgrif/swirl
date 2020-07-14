@@ -6,7 +6,7 @@ A simple, efficient background work queue for Rust
 
 Swirl is a background work queue built on Diesel and PostgreSQL's row locking
 features. It was extracted from [crates.io](crates.io), which uses it for
-updating the index off the web server.
+updating the index of the web server.
 
 This library is still in its early stages, and has not yet reached 0.1 status.
 We're using it successfully in production on crates.io today, but there are
